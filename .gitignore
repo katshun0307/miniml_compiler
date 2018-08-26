@@ -2,6 +2,7 @@
 *.cmo 
 *.cmt 
 *.cmti
+*.cmx
 *.annot
 *.automaton
 *.depend
@@ -15,4 +16,5 @@ lexer.ml
 .vscode/
 parser.conflicts
 .DS_Store
+miniml
 minimlc

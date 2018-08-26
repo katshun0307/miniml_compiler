@@ -44,6 +44,6 @@ rule main = parse
      }
 | eof { exit 0 }
 and comment i = parse
-  | "*)" { if i = 1 then main lexbuf else comment (i-1) lexbuf } 
+  | "*)" { if i = 1 then main lexbuf else comment (i-1) lexbuf }
   | "(*" { comment (i+1) lexbuf }
   | _ {comment i lexbuf}
