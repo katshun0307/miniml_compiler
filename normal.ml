@@ -212,23 +212,34 @@ and normalize (prog: S.exp) = (* CompExp (ValExp (IntV 1)) *)
 
 (* ==== recur式が末尾位置にのみ書かれていることを検査 ==== *)
 (* task4: S.exp -> unit *)
-let rec recur_check e: unit = 
-  let recur_err = err "illegal usage of recur" in
-  let loop_depth = ref 0 in
+let rec recur_check e is_tail: unit = 
+  let recur_err () = err "illegal usage of recur" in
   S.(match e with
-      | LoopExp(_, _, e2) -> loop_depth := !loop_depth + 1
       | RecurExp _ -> 
-        if !loop_depth > 0
-        then loop_depth := !loop_depth - 1
-        else recur_err
-      | Var _ | ILit _ | BLit _ -> ()
-      | BinOp(_, e1, e2)| IfExp(_, e1, e2)| LetExp(_, e1, e2)
-      | AppExp(e1, e2)| LetRecExp(_, _, e1, e2)| TupleExp(e1, e2)
-        -> recur_check e1; recur_check e2 
-      | FunExp(_, e)| ProjExp(e, _) -> recur_check e
+        if is_tail then () 
+        else recur_err ()
+      | LoopExp (x, e1, e2) -> 
+        recur_check e1 false; 
+        recur_check e2 is_tail
+      | IfExp(e1, e2, e3) -> 
+        recur_check e1 false;
+        recur_check e2 is_tail;
+        recur_check e3 is_tail
+      | LetExp(x, e1, e2) -> 
+        recur_check e1 false;
+        recur_check e2 is_tail
+      | LetRecExp(f, x, e1, e2) -> 
+        recur_check e1 false;
+        recur_check e2 is_tail
+      | FunExp(_, e) | ProjExp(e, _) -> 
+        recur_check e false
+      | BinOp(_, e1, e2) | AppExp(e1, e2) | TupleExp(e1, e2) -> 
+        recur_check e1 false;
+        recur_check e2 false
+      | _ -> () (* Var, ILit, BLit *)
     )
 
 (* ==== entry point ==== *)
 let rec convert prog =
-  recur_check prog;
+  recur_check prog false;
   normalize prog
