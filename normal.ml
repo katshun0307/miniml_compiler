@@ -13,7 +13,9 @@ let fresh_id = Misc.fresh_id_maker "_"
 type value =
     Var  of id
   | IntV of int
-  | BoolV of bool (* added*)
+
+let int_of_bool b = 
+  if b then 1 else 0
 
 (* ==== 式 ==== *)
 type cexp =
@@ -43,9 +45,6 @@ let string_of_norm e =
     | IntV i ->
       let s = text (string_of_int i) in
       if i < 0 then text "(" <*> s <*> text ")" else s
-    (* added for BoolV *)
-    | BoolV b -> 
-      let s = text (string_of_bool b) in s
   in
   let rec pr_of_cexp p e =
     let enclose p' e = if p' < p then text "(" <*> e <*> text ")" else e in
@@ -93,7 +92,6 @@ let string_of_norm e =
       enclose 3 (text "recur" <+> pr_of_value v)
   in layout (pretty 30 (pr_of_exp 0 e))
 
-
 (* ==== 正規形への変換 ==== *)
 and normalize (prog: S.exp) = (* CompExp (ValExp (IntV 1)) *)
   (* normal substitution for syntax.Exp *)
@@ -126,30 +124,28 @@ and normalize (prog: S.exp) = (* CompExp (ValExp (IntV 1)) *)
      | LetExp(a, e1, e2) -> LetExp(a, e1, special_subst_2 substee x e2)
      | _ -> subst_exp_2 substee x subster
     ) in
-  let rec c_of_e e = 
-    let variable_conversion = ref MySet.empty in
-    let append_conv x _x = variable_conversion := (MySet.insert (x, _x) !variable_conversion) in
+  let rec c_of_e e (sigma: (string * S.exp) MySet.t) = (* convert syntax.exp to language C *)
+    let append_sigma x _x = (MySet.insert (x, _x) sigma) in
+    let find_conv e = List.assoc e (MySet.to_list !variable_conversion) in
     S.(match e with 
-        | S.Var x -> append_conv e x;
-          Var x
+        | S.Var x -> Var(find_conv x)
         | S.ILit i -> ILit i
         | S.BLit b -> BLit b
         | S.BinOp(op, e1, e2) -> 
           let x1 = fresh_id "b" in
           let x2 = fresh_id "b" in
-          let e1_eval = c_of_e e1 in
-          let e2_eval = c_of_e e2 in
-          append_conv e1 x1;
-          append_conv e2 x2;
+          let e1_eval = c_of_e e1 sigma in
+          let e2_eval = c_of_e e2 sigma in
           LetExp(x1, e1_eval, LetExp(x2, e2_eval, BinOp(op, Var x1, Var x2)))
         | S.IfExp(cond, e1, e2) -> 
-          let cond_eval = c_of_e cond in
-          IfExp(cond_eval, e1, e2)
+          let cond_id = fresh_id  "if" in
+          let cond_eval = c_of_e cond sigma in
+          LetExp(cond_id, cond_eval, IfExp(cond_eval, e1, e2))
         | S.LetExp(id, e1, e2) -> 
           let t1 = fresh_id "t" in
-          let e1_eval = c_of_e e1 in
-          let ev = subst_exp_1 (c_of_e e2) (Var id) (Var t1) in
-          append_conv e1 t1;
+          let e1_eval = c_of_e e1 sigma in
+          let sigma' = append_sigma t1 e1 in
+          let ev = c_of_e e2 sigma' in
           LetExp(t1, e1_eval, ev)
         | S.FunExp(id, e) -> 
           (* reformat fun expression to recursive let *)
@@ -158,22 +154,21 @@ and normalize (prog: S.exp) = (* CompExp (ValExp (IntV 1)) *)
         | S.AppExp(e1, e2) -> 
           let x1 = fresh_id "a" in
           let x2 = fresh_id "a" in
-          let e1_eval = c_of_e e1 in
-          let e2_eval = c_of_e  e2 in 
-          append_conv e1 x1;
-          append_conv e2 x2;
+          let e1_eval = c_of_e e1 sigma in
+          let e2_eval = c_of_e e2 sigma in 
+          (* append_conv e1 x1;
+             append_conv e2 x2; *)
           LetExp(x1, e1_eval, LetExp(x2, e2_eval, AppExp(Var x1, Var x2)))
         | S.LetRecExp(id, p, e1, e2) -> 
           let t1 = fresh_id "p" in
-          let e1_eval = c_of_e e1 in
-          append_conv e1 t1;
-          LetRecExp(id, t1, subst_exp_1 e1_eval (Var p) (Var t1), c_of_e e2)
+          let e1_eval = c_of_e e1 sigma in
+          LetRecExp(id, t1, subst_exp_1 e1_eval (Var p) (Var t1), c_of_e e2 sigma)
         | _ -> err "not implemented")
   in let rec norm_of_c = function
-      (* val = x | n | true | false *)
       | S.Var x -> CompExp(ValExp (Var x))
       | S.ILit i -> CompExp(ValExp (IntV i))
-      | S.BLit b -> CompExp(ValExp (BoolV b))
+      | S.BLit b -> 
+        CompExp(ValExp (IntV (int_of_bool b))) 
       | S.BinOp(op, e1, e2) -> (* bop * val * val *)
         (match e1, e2 with
          | S.ILit i, S.ILit j -> CompExp(BinOp (op, IntV i, IntV j))
@@ -183,7 +178,7 @@ and normalize (prog: S.exp) = (* CompExp (ValExp (IntV 1)) *)
          | S.BLit b -> 
            let e1' = norm_of_c e1 in
            let e2' = norm_of_c e2 in
-           CompExp(IfExp(BoolV b, e1', e2'))
+           CompExp(IfExp(IntV(int_of_bool b), e1', e2'))
          | _ -> err "norm_of_c: encounterd non BLit at IfExp")
       | S.LetExp(id, e1, e2) -> (* id * exp * exp *)
         let x = Var (fresh_id "spsubst") in
