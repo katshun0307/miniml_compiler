@@ -165,7 +165,7 @@ let rec recur_check e is_tail: unit =
         else recur_err ()
       | LoopExp (x, e1, e2) -> 
         recur_check e1 false; 
-        recur_check e2 is_tail
+        recur_check e2 true
       | IfExp(e1, e2, e3) -> 
         recur_check e1 false;
         recur_check e2 is_tail;
