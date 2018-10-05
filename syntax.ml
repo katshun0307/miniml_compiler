@@ -40,8 +40,8 @@ let rec string_of_exp e =
   | LetRecExp(id, p, e1, e2) -> "LetRecExp" ^ make_paren[Var id; Var p; e1; e2]
   | LoopExp(id, e1, e2) -> "LoopExp" ^ make_paren[Var id; e1; e2]
   | RecurExp(e) -> "RecurExp" ^ make_paren [e]
-  | TupleExp(e1, e2) -> "(" ^ string_of_exp e1 ^ ", " ^ string_of_exp e2 ^ ")"
-  | ProjExp(e, i) -> string_of_exp e ^ ".get" ^ string_of_int i
+  | TupleExp(e1, e2) -> "Tuple(" ^ string_of_exp e1 ^ ", " ^ string_of_exp e2 ^ ")"
+  | ProjExp(e, i) -> "Proj(" ^ string_of_exp e ^ ", " ^ string_of_int i ^ ")"
 
 let rec recur_app_exp folding e =
   (* recursive application of function fold to exp recursively *)

@@ -15,6 +15,7 @@ let rec compile prompt ichan cont =
 
   (* Parsing (2章) *)
   let prog = Parser.toplevel Lexer.main (Lexing.from_channel ichan) in
+  dprint (fun () -> "(* [Parsed form] *)\n" ^ Syntax.string_of_exp prog ^ "\n");
 
   (* Normal form conversion (3章) *)
   let norm = Normal.convert prog in

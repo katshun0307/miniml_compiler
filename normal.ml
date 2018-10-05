@@ -93,37 +93,90 @@ let string_of_norm e =
   in layout (pretty 30 (pr_of_exp 0 e))
 
 (* ==== 正規形への変換 ==== *)
-and normalize (prog: S.exp) = (* CompExp (ValExp (IntV 1)) *)
+let rec norm_exp (e: Syntax.exp) (f: cexp -> exp) = 
+  match e with
+  | S.Var i -> f (ValExp (Var ("_" ^ i)))
+  | S.ILit i ->  f (ValExp (IntV i))
+  | S.BLit b -> f (ValExp (IntV (int_of_bool b)))
+  | BinOp(op, e1, e2) -> 
+    let x1 = (fresh_id "bin") in
+    let x2 = (fresh_id "bin") in
+    norm_exp e1 (fun x ->
+        (norm_exp e2 (fun y ->
+             (LetExp(x2, y, LetExp(x1, x, f (BinOp(op, Var x1, Var x2))))))))
+  | IfExp(cond, e1, e2) -> 
+    let x = fresh_id "if" in
+    norm_exp e1 (fun y ->
+        LetExp(x, y, f (IfExp(Var x, f y, norm_exp e2 f))))
+  | LetExp(id, e1, e2) -> 
+    let t1 = fresh_id "let" in
+    norm_exp e2 (fun y2 -> 
+        (norm_exp e1 (fun y1 -> 
+             (LetExp(t1, y1, f y2)))))
+  | FunExp(id, e) -> 
+    let funf = fresh_id "funf" in
+    let funx = fresh_id "funx" in
+    norm_exp e (fun y -> 
+        LetRecExp(funf, funx, f y, f (ValExp(Var funf))))
+  | AppExp(e1, e2) -> 
+    let t1 = fresh_id "app" in
+    let t2 = fresh_id "app" in
+    norm_exp e1 (fun y1 -> 
+        (norm_exp e2 (fun y2 -> 
+             LetExp(t1, y1, LetExp(t2, y2, f (AppExp(Var t1, Var t2)))))))
+  | LetRecExp(f, id, e1, e2) -> err "not implemented"
+  | LoopExp(id, e1, e2) -> 
+    norm_exp e1 (fun y1 -> 
+        norm_exp e2 (fun y2 -> 
+            LoopExp(id, y1, f y2))) (* change *)
+  | RecurExp(e) -> 
+    let t = fresh_id "recur" in
+    norm_exp e (fun y1 -> 
+        LetExp(t, y1, RecurExp(Var t)))
+  | TupleExp(e1, e2) -> 
+    let t1 = fresh_id "tuple" in
+    let t2 = fresh_id "tuple" in
+    norm_exp e1 (fun y1 -> 
+        norm_exp e2 (fun y2 -> 
+            LetExp(t1, y1, LetExp(t2, y2, f (TupleExp(Var t1, Var t2))))))
+  | ProjExp(e, i) ->
+    let t = fresh_id "proj" in
+    norm_exp e (fun y -> 
+        LetExp(t, y, f (ProjExp(Var t, i))))
+
+and normalize e = norm_exp e (fun ce -> CompExp ce)
 
 
-  (* ==== recur式が末尾位置にのみ書かれていることを検査 ==== *)
-  (* task4: S.exp -> unit *)
-  let rec recur_check e is_tail: unit = 
-    let recur_err () = err "illegal usage of recur" in
-    S.(match e with
-        | RecurExp _ -> 
-          if is_tail then () 
-          else recur_err ()
-        | LoopExp (x, e1, e2) -> 
-          recur_check e1 false; 
-          recur_check e2 is_tail
-        | IfExp(e1, e2, e3) -> 
-          recur_check e1 false;
-          recur_check e2 is_tail;
-          recur_check e3 is_tail
-        | LetExp(x, e1, e2) -> 
-          recur_check e1 false;
-          recur_check e2 is_tail
-        | LetRecExp(f, x, e1, e2) -> 
-          recur_check e1 false;
-          recur_check e2 is_tail
-        | FunExp(_, e) | ProjExp(e, _) -> 
-          recur_check e false
-        | BinOp(_, e1, e2) | AppExp(e1, e2) | TupleExp(e1, e2) -> 
-          recur_check e1 false;
-          recur_check e2 false
-        | _ -> () (* Var, ILit, BLit *)
-      )
+
+
+(* ==== recur式が末尾位置にのみ書かれていることを検査 ==== *)
+(* task4: S.exp -> unit *)
+let rec recur_check e is_tail: unit =   
+  let recur_err () = err "illegal usage of recur" in
+  S.(match e with
+      | RecurExp _ -> 
+        if is_tail then () 
+        else recur_err ()
+      | LoopExp (x, e1, e2) -> 
+        recur_check e1 false; 
+        recur_check e2 is_tail
+      | IfExp(e1, e2, e3) -> 
+        recur_check e1 false;
+        recur_check e2 is_tail;
+        recur_check e3 is_tail
+      | LetExp(x, e1, e2) -> 
+        recur_check e1 false;
+        recur_check e2 is_tail
+      | LetRecExp(f, x, e1, e2) -> 
+        recur_check e1 false;
+        recur_check e2 is_tail
+      | FunExp(_, e) | ProjExp(e, _) -> 
+        recur_check e false
+      | BinOp(_, e1, e2) | AppExp(e1, e2) | TupleExp(e1, e2) -> 
+        recur_check e1 false;
+        recur_check e2 false
+      | _ -> () (* Var, ILit, BLit *)
+    )
 
 (* ==== entry point ==== *)
 let rec convert prog =
