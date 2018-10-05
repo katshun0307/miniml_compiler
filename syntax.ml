@@ -32,7 +32,7 @@ let rec string_of_exp e =
   | Var id -> id
   | ILit i -> string_of_int i
   | BLit b -> string_of_bool b
-  | BinOp(op, e1, e2) -> "BinOp" ^ make_paren [e1; e2]
+  | BinOp(op, e1, e2) -> "BinOp(" ^ string_of_op op ^ ", " ^ string_of_exp e1 ^ ", " ^ string_of_exp e2 ^ ")"
   | IfExp(cond, e1, e2) -> "IfExp" ^ make_paren [cond; e1; e2]
   | LetExp(id, e1, e2) -> "LetExp" ^ make_paren [Var id; e1; e2]
   | FunExp(id, e) -> "FunExp" ^ make_paren [Var id; e]

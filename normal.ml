@@ -93,60 +93,66 @@ let string_of_norm e =
   in layout (pretty 30 (pr_of_exp 0 e))
 
 (* ==== 正規形への変換 ==== *)
-let rec norm_exp (e: Syntax.exp) (f: cexp -> exp) = 
+let rec norm_exp (e: Syntax.exp) (f: cexp -> exp) (sigma: id Environment.t) = 
   match e with
-  | S.Var i -> f (ValExp (Var ("_" ^ i)))
+  | S.Var i -> 
+    let maybe_fail i = 
+      try f(ValExp(Var(Environment.lookup i sigma)))
+      with Environment.Not_bound -> f (ValExp(Var ("_" ^ i ^ "temp")))
+    in maybe_fail i 
   | S.ILit i ->  f (ValExp (IntV i))
   | S.BLit b -> f (ValExp (IntV (int_of_bool b)))
   | BinOp(op, e1, e2) -> 
-    let x1 = (fresh_id "bin") in
-    let x2 = (fresh_id "bin") in
-    norm_exp e1 (fun x ->
-        (norm_exp e2 (fun y ->
-             (LetExp(x2, y, LetExp(x1, x, f (BinOp(op, Var x1, Var x2))))))))
+    let x1 = fresh_id "bin" in
+    let x2 = fresh_id "bin" in
+    (norm_exp e1 (fun x ->
+         (norm_exp e2 (fun y ->
+              (LetExp(x2, y, LetExp(x1, x, f (BinOp(op, Var x1, Var x2))))))) sigma) sigma)
   | IfExp(cond, e1, e2) -> 
     let x = fresh_id "if" in
     norm_exp e1 (fun y ->
-        LetExp(x, y, f (IfExp(Var x, f y, norm_exp e2 f))))
+        LetExp(x, y, f (IfExp(Var x, f y, norm_exp e2 f sigma)))) sigma
   | LetExp(id, e1, e2) -> 
     let t1 = fresh_id "let" in
-    norm_exp e2 (fun y2 -> 
-        (norm_exp e1 (fun y1 -> 
-             (LetExp(t1, y1, f y2)))))
+    let sigma' = Environment.extend id t1 sigma in
+    norm_exp e1 (fun y1 -> 
+        LetExp(t1, y1, norm_exp e2 f sigma')) sigma
   | FunExp(id, e) -> 
     let funf = fresh_id "funf" in
     let funx = fresh_id "funx" in
-    norm_exp e (fun y -> 
-        LetRecExp(funf, funx, f y, f (ValExp(Var funf))))
+    let sigma' = Environment.extend id funx sigma in
+    LetRecExp(funf, funx, norm_exp e f sigma', f (ValExp(Var funf)))
   | AppExp(e1, e2) -> 
     let t1 = fresh_id "app" in
     let t2 = fresh_id "app" in
     norm_exp e1 (fun y1 -> 
         (norm_exp e2 (fun y2 -> 
-             LetExp(t1, y1, LetExp(t2, y2, f (AppExp(Var t1, Var t2)))))))
-  | LetRecExp(f, id, e1, e2) -> err "not implemented"
+             LetExp(t1, y1, LetExp(t2, y2, f (AppExp(Var t1, Var t2)))))) sigma) sigma
+  | LetRecExp(funct, id, e1, e2) -> 
+    let recf = fresh_id "recf" in
+    let recx = fresh_id "recx" in
+    let sigma' = Environment.extend funct recf (Environment.extend id recx sigma) in
+    LetRecExp(recf, recx, norm_exp e1 f sigma', norm_exp e2 f sigma')
   | LoopExp(id, e1, e2) -> 
     norm_exp e1 (fun y1 -> 
         norm_exp e2 (fun y2 -> 
-            LoopExp(id, y1, f y2))) (* change *)
+            LoopExp(id, y1, f y2))sigma )sigma (* change *)
   | RecurExp(e) -> 
     let t = fresh_id "recur" in
     norm_exp e (fun y1 -> 
-        LetExp(t, y1, RecurExp(Var t)))
+        LetExp(t, y1, RecurExp(Var t))) sigma
   | TupleExp(e1, e2) -> 
     let t1 = fresh_id "tuple" in
     let t2 = fresh_id "tuple" in
     norm_exp e1 (fun y1 -> 
         norm_exp e2 (fun y2 -> 
-            LetExp(t1, y1, LetExp(t2, y2, f (TupleExp(Var t1, Var t2))))))
+            LetExp(t1, y1, LetExp(t2, y2, f (TupleExp(Var t1, Var t2))))) sigma) sigma
   | ProjExp(e, i) ->
     let t = fresh_id "proj" in
     norm_exp e (fun y -> 
-        LetExp(t, y, f (ProjExp(Var t, i))))
+        LetExp(t, y, f (ProjExp(Var t, i)))) sigma
 
-and normalize e = norm_exp e (fun ce -> CompExp ce)
-
-
+and normalize e = norm_exp e (fun ce -> CompExp ce) Environment.empty
 
 
 (* ==== recur式が末尾位置にのみ書かれていることを検査 ==== *)
