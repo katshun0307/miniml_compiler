@@ -134,9 +134,14 @@ let rec norm_exp (e: Syntax.exp) (f: cexp -> exp) (sigma: id Environment.t) =
     let sigma' = Environment.extend funct recf (Environment.extend id recx sigma) in
     LetRecExp(recf, recx, norm_exp e1 f sigma', norm_exp e2 f sigma')
   | LoopExp(id, e1, e2) -> 
-    norm_exp e1 (fun y1 -> 
+    let loopvar = fresh_id "loopval" in
+    let loopinit = fresh_id "loopinit" in
+    let sigma' = Environment.extend id loopvar sigma in
+    (* norm_exp e1 (fun y1 -> 
         norm_exp e2 (fun y2 -> 
-            LoopExp(id, y1, f y2))sigma )sigma (* change *)
+            LetExp(loopinit, y1, LoopExp(loopvar, ValExp(Var loopinit), f y2))) sigma') sigma' *)
+    norm_exp e1 (fun y1 -> 
+        LetExp(loopinit, y1, LoopExp(loopvar, ValExp(Var loopinit), norm_exp e2 f sigma'))) sigma'
   | RecurExp(e) -> 
     let t = fresh_id "recur" in
     norm_exp e (fun y1 -> 
