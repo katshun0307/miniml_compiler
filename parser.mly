@@ -61,7 +61,8 @@ FunExpr :
     FUN i=ID RARROW e=Expr { FunExp (i, e) }
 
 LetRecExpr :
-    LET REC i=ID EQ FUN p=ID RARROW e1=Expr IN e2=Expr
+    | LET REC i=ID EQ FUN p=ID RARROW e1=Expr IN e2=Expr
+    | LET REC i=ID p=ID EQ e1=Expr IN e2=Expr
       { if i = p then
           err "Name conflict"
         else if i = "main" then
