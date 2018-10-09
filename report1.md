@@ -302,9 +302,49 @@ let rec eval_exp env = function
 
 > `syntax.ml` 中の `recur_check` 関数を完成させることにより,recur式の検査を実装しなさい. `parser.mly` 中の呼び出している箇所を見ると分かるとおり, `recur_check` 関数は `unit` 型の値を返す.末尾位置ではないところに書かれた `recur` 式を発見したら,即座に例外を投げコンパイル処理を中断すること.
 
+`recur_check`の内部に,`Syntax.exp`と,その expression が末尾位置であるかを示す`is_tail`を引数に取る再帰関数を定義し,`recur`式が正しい位置にあるかどうか確認する.
+
+#### `normal.ml`
+
+```{.ocaml .numberLines startFrom="163"}
+(* ==== recur式が末尾位置にのみ書かれていることを検査 ==== *)
+(* task4: S.exp -> unit *)
+let rec recur_check e is_tail: unit =   
+  let recur_err () = err "illegal usage of recur" in
+  S.(match e with
+      | RecurExp _ -> 
+        if is_tail then () 
+        else recur_err ()
+      | LoopExp (x, e1, e2) -> 
+        recur_check e1 false; 
+        recur_check e2 true
+      | IfExp(e1, e2, e3) -> 
+        recur_check e1 false;
+        recur_check e2 is_tail;
+        recur_check e3 is_tail
+      | LetExp(x, e1, e2) -> 
+        recur_check e1 false;
+        recur_check e2 is_tail
+      | LetRecExp(f, x, e1, e2) -> 
+        recur_check e1 false;
+        recur_check e2 is_tail
+      | FunExp(_, e) | ProjExp(e, _) -> 
+        recur_check e false
+      | BinOp(_, e1, e2) | AppExp(e1, e2) | TupleExp(e1, e2) -> 
+        recur_check e1 false;
+        recur_check e2 false
+      | _ -> () (* Var, ILit, BLit *)
+    )
+
+(* ==== entry point ==== *)
+let rec convert prog =
+  recur_check prog false;
+  normalize prog
+```
+
 # 課題5 (正規形への変換: 必須)
 
-> 言語Cへの変換と,正規形への変換を同時に行う,`normal.ml` 中の `norm_exp` 関数を完成させよ.関数は次に示す形で実装すること.引数`f`を適切に用いれば各場合分けで数行書くだけで完成する.
+> 言語Cへの変換と,正規形への変換を同時に行う,`normal.ml` 中の `norm_exp` 関数を完成させよ.関数は次に示す形で実装すること.
 
 # 課題6 (クロージャ変換: 必須)
 
