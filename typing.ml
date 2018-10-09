@@ -153,6 +153,21 @@ let rec ty_exp tyenv = function
     (* unify all eqls *)
     let main_subst = unify( (e1_ty, ty_x) ::eqls_of_subst e1_subst @ eqls_of_subst e2_subst) in
     (subst_type main_subst e2_ty, main_subst)
+  | TupleExp(e1, e2) -> 
+    let tyarg1, tysubst1 = ty_exp tyenv e1 in
+    let tyarg2, tysubst2 = ty_exp tyenv e2 in
+    let main_subst = unify(eqls_of_subst tysubst1 @ eqls_of_subst tysubst2) in
+    let ty1 = subst_type main_subst tyarg1 in
+    let ty2 = subst_type main_subst tyarg2 in
+    (TyTuple(ty1, ty2), main_subst)
+  | ProjExp(e, i) -> 
+    let tyarg, tysubst = ty_exp tyenv e in
+    (match tyarg with
+     | TyTuple(ty1, ty2) -> 
+       if i = 1 then (ty1, tysubst)
+       else if i = 2 then (ty2, tysubst)
+       else err "non valid projection target"
+     | _ -> err "projection of non-tuple")
   | _ -> err "ty_exp: not implemented"
 
 let rec ty_decl tyenv = function

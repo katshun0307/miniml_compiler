@@ -8,6 +8,7 @@ open Syntax
 type exval =
   | IntV of int
   | BoolV of bool
+  | TupleV of exval * exval
   | ProcV of id * exp * dnval Environment.t ref
 and dnval = exval
 
@@ -19,6 +20,8 @@ let err s = raise (Error s)
 let rec string_of_exval = function
     IntV i -> string_of_int i
   | BoolV b -> string_of_bool b
+  | TupleV(v1, v2) -> 
+    "(" ^ string_of_exval v1 ^ ", " ^ string_of_exval v2 ^ ")"
   | ProcV _ -> "<fun(´･ω･｀* (⊃⌒＊⌒)>"
 
 let pp_val v = print_string (string_of_exval v)
@@ -86,7 +89,18 @@ let rec eval_exp env = function
     let newenv = Environment.extend id (ProcV(para, exp1, dummyenv)) env in
     dummyenv := newenv;
     eval_exp newenv exp2
-  | _ -> err "not implemented"
+  | LoopExp(id, e1, e2) -> err "not implemented"
+  | RecurExp(e) -> err "not implemented"
+  | TupleExp(e1, e2) -> 
+    let v1 = eval_exp env e1 in
+    let v2 = eval_exp env e2 in 
+    TupleV(v1, v2)
+  | ProjExp(e, i) -> 
+    (match eval_exp env e with
+     | TupleV(v1, v2) -> if i = 1 then v1
+       else if i = 2 then v2 
+       else err "ProjExp: index not valid"
+     | _ -> err "error: projection of non-tuple")
 
 let eval_decl env = function
     Exp e -> let v = eval_exp env e in ("-", env, v)
