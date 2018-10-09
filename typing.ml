@@ -161,13 +161,15 @@ let rec ty_exp tyenv = function
     let ty2 = subst_type main_subst tyarg2 in
     (TyTuple(ty1, ty2), main_subst)
   | ProjExp(e, i) -> 
-    let tyarg, tysubst = ty_exp tyenv e in
-    (match tyarg with
-     | TyTuple(ty1, ty2) -> 
-       if i = 1 then (ty1, tysubst)
-       else if i = 2 then (ty2, tysubst)
-       else err "non valid projection target"
-     | _ -> err "projection of non-tuple")
+    (let tyarg, tysubst = ty_exp tyenv e in
+     let t1 = TyVar(fresh_tyvar()) in
+     let t2 = TyVar(fresh_tyvar()) in
+     let main_subst = unify(eqls_of_subst tysubst @ [(tyarg, TyTuple(t1, t2))]) in
+     let ty1 = subst_type main_subst t1 in
+     let ty2 = subst_type main_subst t2 in
+     if i = 1 then (subst_type tysubst ty1, tysubst)
+     else if i = 2 then (subst_type tysubst ty2, tysubst)
+     else err "non valid projection target")
   | _ -> err "ty_exp: not implemented"
 
 let rec ty_decl tyenv = function

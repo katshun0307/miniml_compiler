@@ -89,8 +89,6 @@ let rec eval_exp env = function
     let newenv = Environment.extend id (ProcV(para, exp1, dummyenv)) env in
     dummyenv := newenv;
     eval_exp newenv exp2
-  | LoopExp(id, e1, e2) -> err "not implemented"
-  | RecurExp(e) -> err "not implemented"
   | TupleExp(e1, e2) -> 
     let v1 = eval_exp env e1 in
     let v2 = eval_exp env e2 in 
@@ -101,6 +99,7 @@ let rec eval_exp env = function
        else if i = 2 then v2 
        else err "ProjExp: index not valid"
      | _ -> err "error: projection of non-tuple")
+  | _ -> err "eval_exp: should not enter this match"
 
 let eval_decl env = function
     Exp e -> let v = eval_exp env e in ("-", env, v)

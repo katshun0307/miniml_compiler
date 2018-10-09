@@ -54,7 +54,7 @@ let tyvar_string_of_int n =
 let rec string_of_ty = function
   | TyInt ->  "int"
   | TyBool ->  "bool"
-  | TyTuple(a, b) -> "(" ^ string_of_ty a ^ ", " ^ string_of_ty b ^ ")"
+  | TyTuple(a, b) -> "(" ^ string_of_ty a ^ " * " ^ string_of_ty b ^ ")"
   | TyVar id ->  tyvar_string_of_int id
   | TyFun(a, b) -> 
     (match a with
@@ -77,3 +77,21 @@ let freevar_ty ty_in =
      | TyFun(a, b) -> MySet.union (loop a current) (loop b current)
      | _ -> current) in
   loop ty_in MySet.empty
+
+let rec string_of_exp e = 
+  let make_paren l = 
+    (List.fold_left (fun s n -> s ^ ", " ^ string_of_exp n) "(" l ) ^ ")" in
+  match e with
+  | Var id -> id
+  | ILit i -> string_of_int i
+  | BLit b -> string_of_bool b
+  | BinOp(op, e1, e2) -> "BinOp(" ^ string_of_op op ^ ", " ^ string_of_exp e1 ^ ", " ^ string_of_exp e2 ^ ")"
+  | IfExp(cond, e1, e2) -> "IfExp" ^ make_paren [cond; e1; e2]
+  | LetExp(id, e1, e2) -> "LetExp" ^ make_paren [Var id; e1; e2]
+  | FunExp(id, e) -> "FunExp" ^ make_paren [Var id; e]
+  | AppExp(e1, e2) -> "AppExp" ^ make_paren [e1; e2]
+  | LetRecExp(id, p, e1, e2) -> "LetRecExp" ^ make_paren[Var id; Var p; e1; e2]
+  | LoopExp(id, e1, e2) -> "LoopExp" ^ make_paren[Var id; e1; e2]
+  | RecurExp(e) -> "RecurExp" ^ make_paren [e]
+  | TupleExp(e1, e2) -> "Tuple(" ^ string_of_exp e1 ^ ", " ^ string_of_exp e2 ^ ")"
+  | ProjExp(e, i) -> "Proj(" ^ string_of_exp e ^ ", " ^ string_of_int i ^ ")"
