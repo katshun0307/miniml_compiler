@@ -98,7 +98,8 @@ let rec norm_exp (e: Syntax.exp) (f: cexp -> exp) (sigma: id Environment.t) =
   | S.Var i -> 
     let maybe_fail i = 
       try f(ValExp(Var(Environment.lookup i sigma)))
-      with Environment.Not_bound -> f (ValExp(Var ("_" ^ i ^ "temp")))
+      with Environment.Not_bound -> (* should not enter here *)
+        f (ValExp(Var ("_" ^ i ^ "temp"))) 
     in maybe_fail i 
   | S.ILit i ->  f (ValExp (IntV i))
   | S.BLit b -> f (ValExp (IntV (int_of_bool b)))
@@ -120,8 +121,9 @@ let rec norm_exp (e: Syntax.exp) (f: cexp -> exp) (sigma: id Environment.t) =
   | FunExp(id, e) -> 
     let funf = fresh_id "funf" in
     let funx = fresh_id "funx" in
+    (* let rec funf funx = e[id-> funx] in f *)
     let sigma' = Environment.extend id funx sigma in
-    LetRecExp(funf, funx, norm_exp e f sigma', f (ValExp(Var funf)))
+    LetRecExp(funf, funx, norm_exp e (fun ce -> CompExp ce) sigma', f (ValExp(Var funf)))
   | AppExp(e1, e2) -> 
     let t1 = fresh_id "app" in
     let t2 = fresh_id "app" in
@@ -132,7 +134,7 @@ let rec norm_exp (e: Syntax.exp) (f: cexp -> exp) (sigma: id Environment.t) =
     let recf = fresh_id "recf" in
     let recx = fresh_id "recx" in
     let sigma' = Environment.extend funct recf (Environment.extend id recx sigma) in
-    LetRecExp(recf, recx, norm_exp e1 f sigma', norm_exp e2 f sigma')
+    LetRecExp(recf, recx, norm_exp e1 (fun ce -> CompExp ce) sigma', norm_exp e2 f sigma')
   | LoopExp(id, e1, e2) -> 
     let loopvar = fresh_id "loopval" in
     let loopinit = fresh_id "loopinit" in
