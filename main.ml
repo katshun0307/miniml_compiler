@@ -32,6 +32,7 @@ let rec compile prompt ichan cont =
   (* Translate to VM (5章後半) *)
   let vmcode = Vm.trans flat in
   dprint (fun () -> "\n(* [VM code] *)\n" ^ (Vm.string_of_vm vmcode));
+  Vm_simulator.run vmcode;
 
   (* 制御フローグラフを表示 *)
   if !display_cfg && not !optimize then
