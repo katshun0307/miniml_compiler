@@ -111,7 +111,7 @@ let string_of_closure e =
 let convert_id (i: N.id): id = "_" ^ i
 
 let convert_val = function
-  | N.Var v -> Var v
+  | N.Var v -> Var ("_" ^ v)
   | N.IntV i -> IntV i
 
 let get_out_of_scope_variables (e: N.exp) (included: N.id list): value list = 
