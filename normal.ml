@@ -111,8 +111,10 @@ let rec norm_exp (e: Syntax.exp) (f: cexp -> exp) (sigma: id Environment.t) =
               (LetExp(x2, y, LetExp(x1, x, f (BinOp(op, Var x1, Var x2))))))) sigma) sigma)
   | IfExp(cond, e1, e2) -> 
     let x = fresh_id "if" in
-    norm_exp e1 (fun y ->
-        LetExp(x, y, f (IfExp(Var x, f y, norm_exp e2 f sigma)))) sigma
+    (* norm_exp e1 (fun y ->
+        LetExp(x, y, f (IfExp(Var x, f y, norm_exp e2 f sigma)))) sigma *)
+    norm_exp cond (fun condy -> 
+        LetExp(x, condy, f (IfExp(Var x, norm_exp e1 (fun x -> CompExp x) sigma, norm_exp e2 (fun x -> CompExp x) sigma)))) sigma
   | LetExp(id, e1, e2) -> 
     let t1 = fresh_id "let" in
     let sigma' = Environment.extend id t1 sigma in
