@@ -6,7 +6,9 @@ val singleton : 'a -> 'b -> ('a, 'b) t
 val from_list : ('a * 'b) list -> ('a, 'b) t
 val to_list : ('a, 'b) t -> ('a * 'b) list
 val assoc : 'a -> 'b -> ('a, 'b) t -> ('a, 'b) t
+val append: 'a -> 'b -> ('a, 'b) t -> ('a, 'b) t
 val get : 'a -> ('a, 'b) t -> 'b option
+val search : 'a -> ('a, 'b) t -> 'b option
 val merge : ('a, 'b) t -> ('a, 'b) t -> ('a, 'b) t
 val remove : 'a -> ('a, 'b) t -> ('a, 'b) t
 val contains : 'a -> ('a, 'b) t -> bool

@@ -88,13 +88,84 @@ let string_of_decl (ProcDecl (lbl, n, instrs)) =
 let string_of_vm prog =
   String.concat "\n" (List.map string_of_decl prog)
 
+let string_of_alloc (alloc: (F.id, id) MyMap.t) = 
+  let string_of_pair ((x: F.id), (y: id)) = "(" ^ (x: string) ^ ", " ^ string_of_int y ^ ") " in
+  let string_list = List.map string_of_pair (MyMap.to_list alloc)
+  in List.fold_left (fun x y -> x ^ y) "" string_list
 
 (* ==== 仮想機械コードへの変換 ==== *)
 
-let trans_decl (F.RecDecl (proc_name, params, body)) =
-  ProcDecl (proc_name, 0,
-            [Move (0, IntV 1);
-             Return (Local 0)])
+let label_of_id (i: F.id): label = i
+
+let trans_decl (F.RecDecl (proc_name, params, body)): decl =
+  (* convert function names to label *)
+  let proc_name' = label_of_id proc_name in
+  (* generate new id *)
+  let fresh_id_count = ref 0 in
+  let fresh_id () = 
+    let ret = !fresh_id_count in
+    fresh_id_count := ret + 1;
+    ret in
+  (* >>> association between F.Var and local(id)s >>> *)
+  let var_alloc = ref (MyMap.empty: (F.id, id) MyMap.t) in
+  let append_local_var (id: F.id) (op: id) = var_alloc := MyMap.append id op !var_alloc in
+  let convert_id i = 
+    match MyMap.search i !var_alloc with
+    | Some x -> x
+    | None -> let new_id: id = fresh_id () in
+      append_local_var i new_id;
+      new_id in
+  let operand_of_val v = 
+    match v with
+    | F.Var id -> Local(convert_id id)
+    | F.Fun id -> Proc(id)
+    | F.IntV i -> IntV i in
+  (* get number of local var (that need to be allocated) *)
+  let n_local_var = List.length(MyMap.to_list !var_alloc) in
+  (* <<< association between F.Var and local(id)s <<< *)
+  (* >>> remember loop >>> *)
+  let loop_stack = ref ([]: (id * label) list) in
+  let push_loop_stack (i, l) = print_string "pushed"; loop_stack := (i, l) :: !loop_stack in
+  let pop_loop_stack () = 
+    match !loop_stack with
+    | hd :: tl -> hd
+    | [] -> (114514, "temp_label") in
+  (* <<< remember loop <<< *)
+  let rec trans_cexp id ce: instr list = 
+    match ce with
+    | F.ValExp(v) -> [Move(convert_id id, operand_of_val v)]
+    | F.BinOp(op, v1, v2) -> [BinOp(convert_id id, op, operand_of_val v1, operand_of_val v2)]
+    | F.AppExp(v, vl) -> [Call(convert_id id, operand_of_val v, List.map operand_of_val vl)]
+    | F.IfExp(v, e1, e2) -> 
+      let new_label1 = "lab" ^ string_of_int(fresh_id ()) in
+      let new_label2 = "lab" ^ string_of_int(fresh_id ()) in
+      let e2' = trans_exp e2 [] ~ret:id in
+      let e1' = trans_exp e1 [] ~ret:id in
+      [BranchIf(operand_of_val v, new_label1)] @ e2' @ [Goto(new_label2); Label(new_label1)] @ e1' @ [Label(new_label2)]
+    | F.TupleExp(vl) -> [Malloc(convert_id id, List.map operand_of_val vl)]
+    | F.ProjExp(v, i) -> [Read(convert_id id, operand_of_val v, i)]
+  and trans_exp (e: F.exp) (accum_instr: instr list) ?(ret="default"): instr list = 
+    match e with
+    | F.CompExp(ce) -> 
+      if ret = "default" then
+        let return_id: F.id = "ret" ^ (string_of_int (fresh_id())) in
+        (match ce with 
+         | F.ValExp(Var id) -> accum_instr @ [Return(operand_of_val (F.Var id))]
+         | _ -> let ret_assign_instr = trans_cexp return_id ce in
+           accum_instr @ ret_assign_instr @ [Return(operand_of_val (F.Var return_id))])
+      else let ret_assign_instr = trans_cexp ret ce in
+        accum_instr @ ret_assign_instr
+    | F.LetExp(id, ce, e) ->
+      let instr' = accum_instr @ trans_cexp id ce in
+      instr' @ trans_exp e [] ~ret 
+    | F.LoopExp(id, ce, e) -> 
+      let loop_label = "loop" ^ (string_of_int (fresh_id ())) in
+      push_loop_stack (convert_id id, loop_label);
+      trans_cexp id ce @ [Label (loop_label)] @ trans_exp e [] ~ret:"default"
+    | F.RecurExp(v) -> 
+      let (id, loop_lab) = pop_loop_stack () in
+      [Move(id, operand_of_val v); Goto(loop_lab)]
+  in ProcDecl(proc_name', n_local_var, trans_exp body [] ~ret:"default")
 
 (* entry point *)
 let trans = List.map trans_decl
