@@ -106,6 +106,89 @@ let string_of_closure e =
       enclose 3 (text "recur" <+> pr_of_value v)
   in layout (pretty 40 (pr_of_exp 0 e))
 
+(* == helper functions === *)
+(* get all free variables in an expression *)
+let convert_id (i: N.id): id = "_" ^ i
+
+let convert_val = function
+  | N.Var v -> Var ("_" ^ v)
+  | N.IntV i -> IntV i
+
+let get_out_of_scope_variables (e: N.exp) (included: N.id list): value list = 
+  let rec loop_e ex accum incl = 
+    let rec loop_ce cex caccum incl = 
+      N.(match cex with
+          | ValExp v | ProjExp(v, _) ->
+            (match (List.find_opt (fun x -> Var x = v) incl), v with
+             | Some x, _ -> caccum
+             | None, Var _ -> MySet.insert v caccum
+             | None, _ -> caccum)
+          (*if not (Var(included) = v) then MySet.insert v caccum
+            else caccum*)
+          | BinOp(_, v1, v2) | AppExp(v1, v2) | TupleExp(v1, v2) -> 
+            MySet.union (loop_ce (ValExp v1) caccum incl) (loop_ce (ValExp v2) caccum incl)
+          | IfExp(v, e1, e2) ->
+            MySet.union (loop_ce (ValExp v) caccum incl) (MySet.union (loop_e e1 accum incl) (loop_e e2 accum incl)))
+    in 
+    N.(match ex with
+        | LetExp(i, cex, ex) -> 
+          MySet.union (loop_ce cex accum incl) (loop_e ex accum (i::incl))
+        | LoopExp(i, cex, ex) -> 
+          MySet.union (loop_ce cex accum incl) (loop_e ex accum incl)
+        | LetRecExp(i1, i2, e1, e2) -> 
+          MySet.union (loop_e e1 accum (i2::incl)) (loop_e e2 accum (i2::incl))
+        | _ -> accum
+      )
+  in
+  List.map convert_val (MySet.to_list (loop_e e MySet.empty included))
+
+(* === conversion to closed normal form === *)
+let rec closure_exp (e: N.exp) (f: cexp -> exp) (sigma: cexp Environment.t): exp = 
+  match e with
+  | N.CompExp(N.ValExp(Var v)) -> 
+    let may_fail v = 
+      try
+        f (Environment.lookup v sigma)
+      with _ -> f (ValExp(Var ("_" ^ v)))
+    in may_fail v
+  | N.CompExp(N.ValExp(IntV i)) -> f (ValExp(IntV i))
+  | N.CompExp(N.BinOp(op, v1, v2)) -> f (BinOp(op, convert_val v1, convert_val v2))
+  | N.CompExp(N.AppExp(v1, v2)) -> 
+    let new_app0 = fresh_id "closure_app" in
+    LetExp(new_app0, ProjExp(convert_val v1, 0), 
+           f (AppExp(Var new_app0, [convert_val v1; convert_val v2])))
+  | N.CompExp(N.IfExp(v, e1, e2)) -> 
+    closure_exp e1 (fun y1 -> 
+        closure_exp e2 (fun y2 -> 
+            CompExp(IfExp(convert_val v, f y1, f y2))) sigma) sigma
+  | N.CompExp(N.TupleExp (v1, v2)) -> f(TupleExp([convert_val v1; convert_val v2]))
+  | N.CompExp(N.ProjExp (v, i)) -> f(ProjExp(convert_val v, i))
+  | N.LetExp(id, ce1, e2) -> 
+    (* closure_exp (CompExp ce1) (fun y1 ->
+        closure_exp e2 (fun y2 ->
+            LetExp(convert_id id, y1, f y2))) *)
+    closure_exp (CompExp ce1) (fun y1 -> 
+        LetExp(convert_id id, y1, closure_exp e2 f sigma)) sigma
+  | N.LetRecExp(funct, id, e1, e2) -> 
+    let recpointer = fresh_id ("b_" ^ funct) in
+    let funct_tuple_list = (Var recpointer:: get_out_of_scope_variables e1 [id]) in
+    let rec make_tuple_env l i env =  (* make environment from id to projection to var in closure *)
+      match l with 
+      | Var hd:: tl ->
+        let env' =  Environment.extend hd (ProjExp(convert_val (Var funct), i)) env in
+        make_tuple_env tl (i+1) env'
+      | [] -> env
+      | _ -> (match l with 
+          | hd:: tl -> err ("unknown input in make_tuple_env" ^ "\n" ^ string_of_closure(CompExp(ValExp(hd))))
+          | _ -> err "none valid match") in
+    let sigma' = make_tuple_env funct_tuple_list 0 Environment.empty in
+    let closure_contents = TupleExp(funct_tuple_list) in
+    let e2' = LetExp(convert_id funct, closure_contents, closure_exp e2 f sigma') in
+    LetRecExp(recpointer, [convert_id funct; convert_id id], closure_exp e1 f sigma', e2')
+  | N.LoopExp(id, ce1, e2) -> 
+    closure_exp (CompExp ce1) (fun y1 -> 
+        LoopExp(convert_id id, y1, closure_exp e2 f sigma)) sigma
+  | N.RecurExp(v) -> RecurExp(convert_val v)
 
 (* entry point *)
-let convert exp = CompExp (ValExp (IntV 1))
+let convert e = closure_exp e (fun ce -> CompExp ce) Environment.empty

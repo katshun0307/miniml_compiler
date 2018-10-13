@@ -11,19 +11,29 @@ let singleton k v = [(k, v)]
 let from_list x = x
 let to_list x = x
 
-let rec assoc k v = function
-    [] -> [(k, v)]
-  | (k', v') :: rest ->
-      if k == k' then
-        (k, v) :: rest
-      else
-        (k', v') :: assoc k v rest
-
 let rec get k = function
     [] -> None
   | (k', v') :: rest ->
-      if k == k' then Some v'
-      else get k rest
+    if k == k' then Some v'
+    else get k rest
+
+let rec assoc k v = function
+    [] -> [(k, v)]
+  | (k', v') :: rest ->
+    if k == k' then
+      (k, v) :: rest
+    else
+      (k', v') :: assoc k v rest
+
+let rec append k v self = 
+  match get k self with
+  | Some x -> self
+  | None -> (k, v):: self
+
+let rec search k self = 
+  match self with
+  | (k', v):: tl -> if k = k' then Some v else search k tl
+  | [] -> None
 
 let merge xs ys =
   List.fold_left (fun zs (k, v) -> assoc k v zs) ys xs
