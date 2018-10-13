@@ -158,9 +158,8 @@ let get_flat_exp ex =
       flat_exp e2 f
     | C.LoopExp(id, ce, e) -> 
       let id' = convert_id id in
-      flat_exp (CompExp ce) (fun cy1 ->
-          flat_exp e (fun y2 -> 
-              LoopExp(id', cy1, f y2)))
+      flat_exp (CompExp ce) (fun cy1 -> 
+          LoopExp(id', cy1, flat_exp e f))
     | C.RecurExp(v) -> RecurExp(convert_val v)
   in let converted = flat_exp ex (fun x -> CompExp x) in
   (converted, !decl_list)

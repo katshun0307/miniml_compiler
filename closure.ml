@@ -186,9 +186,8 @@ let rec closure_exp (e: N.exp) (f: cexp -> exp) (sigma: cexp Environment.t): exp
     let e2' = LetExp(convert_id funct, closure_contents, closure_exp e2 f sigma') in
     LetRecExp(recpointer, [convert_id funct; convert_id id], closure_exp e1 f sigma', e2')
   | N.LoopExp(id, ce1, e2) -> 
-    closure_exp (CompExp ce1) (fun y1 ->
-        closure_exp e2 (fun y2 ->
-            LoopExp(convert_id id, y1, f y2)) sigma) sigma
+    closure_exp (CompExp ce1) (fun y1 -> 
+        LoopExp(convert_id id, y1, closure_exp e2 f sigma)) sigma
   | N.RecurExp(v) -> RecurExp(convert_val v)
 
 (* entry point *)
