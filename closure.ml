@@ -123,8 +123,6 @@ let get_out_of_scope_variables (e: N.exp) (included: N.id list): value list =
              | Some x, _ -> caccum
              | None, Var _ -> MySet.insert v caccum
              | None, _ -> caccum)
-          (*if not (Var(included) = v) then MySet.insert v caccum
-            else caccum*)
           | BinOp(_, v1, v2) | AppExp(v1, v2) | TupleExp(v1, v2) -> 
             MySet.union (loop_ce (ValExp v1) caccum incl) (loop_ce (ValExp v2) caccum incl)
           | IfExp(v, e1, e2) ->
@@ -164,9 +162,6 @@ let rec closure_exp (e: N.exp) (f: cexp -> exp) (sigma: cexp Environment.t): exp
   | N.CompExp(N.TupleExp (v1, v2)) -> f(TupleExp([convert_val v1; convert_val v2]))
   | N.CompExp(N.ProjExp (v, i)) -> f(ProjExp(convert_val v, i))
   | N.LetExp(id, ce1, e2) -> 
-    (* closure_exp (CompExp ce1) (fun y1 ->
-        closure_exp e2 (fun y2 ->
-            LetExp(convert_id id, y1, f y2))) *)
     closure_exp (CompExp ce1) (fun y1 -> 
         LetExp(convert_id id, y1, closure_exp e2 f sigma)) sigma
   | N.LetRecExp(funct, id, e1, e2) -> 
