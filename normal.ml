@@ -94,6 +94,11 @@ let string_of_norm e =
 
 (* ==== 正規形への変換 ==== *)
 let rec norm_exp (e: Syntax.exp) (f: cexp -> exp) (sigma: id Environment.t) = 
+  let smart_fresh_id s e sigma: id = 
+    (match e with
+     | S.Var id -> Environment.lookup id sigma
+     | _ -> fresh_id s)
+  in
   match e with
   | S.Var i -> 
     let maybe_fail i = 
@@ -104,8 +109,8 @@ let rec norm_exp (e: Syntax.exp) (f: cexp -> exp) (sigma: id Environment.t) =
   | S.ILit i ->  f (ValExp (IntV i))
   | S.BLit b -> f (ValExp (IntV (int_of_bool b)))
   | BinOp(op, e1, e2) -> 
-    let x1 = fresh_id "bin" in
-    let x2 = fresh_id "bin" in
+    let x1 = smart_fresh_id "bin" e1 sigma in
+    let x2 = smart_fresh_id "bin" e2 sigma in
     (norm_exp e1 (fun x ->
          (norm_exp e2 (fun y ->
               (LetExp(x2, y, LetExp(x1, x, f (BinOp(op, Var x1, Var x2))))))) sigma) sigma)
@@ -118,8 +123,8 @@ let rec norm_exp (e: Syntax.exp) (f: cexp -> exp) (sigma: id Environment.t) =
   | LetExp(id, e1, e2) -> 
     let t1 = fresh_id "let" in
     let sigma' = Environment.extend id t1 sigma in
-    norm_exp e1 (fun y1 -> 
-        LetExp(t1, y1, norm_exp e2 f sigma')) sigma
+    norm_exp e1 (fun y1 ->
+        LetExp(t1, y1, norm_exp e2 f sigma')) sigma'
   | FunExp(id, e) -> 
     let funf = fresh_id "funf" in
     let funx = fresh_id "funx" in

@@ -635,3 +635,95 @@ AppExpでは,関数のクロージャではなく,クロージャの第一要素
 
 それを実装したのが,以上のコードである.
 
+# 課題7 (平滑化: 必須)
+
+> `flat.ml`の`flatten`関数を完成させることにより，正規形コードを平滑化しなさい.
+
+```{.ocaml .numberLines}
+(* ==== フラット化：変数参照と関数参照の区別も同時に行う ==== *)
+let convert_id (i: C.id): id = i 
+let convert_id_list (il: C.id list): id list = il
+
+let get_flat_exp ex = 
+  (* === helper functions === *)
+  let fun_list = ref (MySet.empty: C.id MySet.t) in
+  let append_fun v = fun_list := MySet.insert v !fun_list in
+  let search_fun v = MySet.member v !fun_list in
+  let decl_list = ref ([]: decl list) in
+  let append_decl d = decl_list := (d :: !decl_list) in 
+  let convert_val (v: C.value): value = 
+    match v with
+    | C.Var id -> if search_fun id 
+      then Fun(id) 
+      else Var(convert_id id)
+    | C.IntV i -> IntV(i) in
+  let convert_val_list (vl: C.value list): value list = List.map convert_val vl in
+  let rec flat_exp (e: C.exp) (f: cexp -> exp): exp = 
+    match e with
+    | C.CompExp(C.ValExp v) -> f (ValExp(convert_val v))
+    | C.CompExp(C.BinOp(op, v1, v2)) -> 
+      let v1' = convert_val v1 in
+      let v2' = convert_val v2 in
+      f (BinOp(op, v1', v2'))
+    | C.CompExp(C.AppExp(v, vl)) ->  
+      let v' = convert_val v in
+      let vl' = convert_val_list vl in
+      f (AppExp(v', vl'))
+    | C.CompExp(C.IfExp(v, e1, e2)) -> 
+      let v' = convert_val v in
+      flat_exp e1 (fun y1 -> 
+          flat_exp e2 (fun y2 -> 
+              f (IfExp(v', f y1, f y2))))
+    | C.CompExp(C.TupleExp(vl)) -> f (TupleExp(convert_val_list vl))
+    | C.CompExp(C.ProjExp(v, i)) -> f (ProjExp(convert_val v, i))
+    | C.LetExp(id, ce, e) -> 
+      flat_exp (CompExp ce) (fun cy1 ->  
+          LetExp(convert_id id, cy1, flat_exp e f))
+    | C.LetRecExp(funct, idl, e1, e2) -> 
+      append_fun (List.hd idl);
+      let letrec' = RecDecl(convert_id funct, convert_id_list idl, flat_exp e1 (fun x -> CompExp x)) in
+      append_decl letrec';
+      flat_exp e2 f
+    | C.LoopExp(id, ce, e) -> 
+      let id' = convert_id id in
+      flat_exp (CompExp ce) (fun cy1 -> 
+          LoopExp(id', cy1, flat_exp e f))
+    | C.RecurExp(v) -> RecurExp(convert_val v)
+  in let converted = flat_exp ex (fun x -> CompExp x) in
+  (converted, !decl_list)
+
+let flatten exp = 
+  let toplevel_content, decl_list = get_flat_exp exp in
+  decl_list @ [RecDecl("_toplevel", [], toplevel_content)]
+```
+
+## `LetRec`式の取り出しと`Fun`変数型への対応
+
+以下のポインタを定義し,変換をする.
+
++ `fun_list`
+: `Fun`変数型へ対応するために,関数へのポインタの集合を追加していく. `convert_val`では, idが`fun_list`に存在すれば`Fun`変数型に変換され, そうでなければ`Var`型に変換される.
+
++ `decl_list`
+: `LetRec`式を入れ子から取り出し,並べるため,`decl_list`に追加していく.
+
+LetRec式の平滑化処理は次のように行う.
+
+1. 関数ポインタのidを`fun_list`に追加する.
+2. 平滑化したLetRec関数を取り出し, `decl_list`に追加する.
+3. 続きの`exp`を`flat_exp`に適応する.
+
+## 返り値
+
+`decl_list`と,残った式を,以下のように`decl list`にして返す.
+
+```ocaml
+let flatten exp = 
+  let toplevel_content, decl_list = get_flat_exp exp in
+  decl_list @ [RecDecl("_toplevel", [], toplevel_content)]
+```
+
+# 課題8 (仮想機械コード生成: 必須)
+
+> `vm.ml`の`trans`関数を完成させることにより，フラット表現から仮想機械コードへの変換を実現しなさい.
+
