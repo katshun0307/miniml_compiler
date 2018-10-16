@@ -73,11 +73,6 @@ let ty_prim op (ty1:ty) (ty2:ty) = match op with
   | Mult -> (TyInt, (ty1, TyInt) :: (ty2, TyInt) :: [])
   | Lt  -> (TyBool, (ty1, TyInt) :: (ty2, TyInt) :: [])
 
-(* let ty_logic op (ty1:ty) (ty2:ty) = 
-   match op with
-   | And -> (TyBool, (ty1, TyBool) :: (ty2, TyBool) :: [])
-   | Or  -> (TyBool, (ty1, TyBool) :: (ty2, TyBool) :: []) *)
-
 let get_type = function
   | TyVar _ -> "tyvar"
   | TyBool -> "tybool"
@@ -98,12 +93,6 @@ let rec ty_exp tyenv = function
     let eqs = (eqls_of_subst tysubst1) @ (eqls_of_subst tysubst2) @ eqs3 in
     let main_subst = unify eqs in
     (ty3, main_subst)
-  (* | LogicOp(op, exp1, exp2) -> 
-     (let tyarg1, tysubst1 = ty_exp tyenv exp1 in
-     let tyarg2, tysubst2 = ty_exp tyenv exp2 in
-     let ty3, eqs3 = ty_logic op tyarg1 tyarg2 in
-     let eqs = (eqls_of_subst tysubst1) @ (eqls_of_subst tysubst2) @ eqs3 in
-     let main_subst = unify eqs in (ty3, main_subst)) *)
   | IfExp (exp1, exp2, exp3) -> 
     let tyarg1, tysubst1 = ty_exp tyenv exp1 in
     let cond_type = get_type tyarg1 in
@@ -146,7 +135,6 @@ let rec ty_exp tyenv = function
     (* first formula *)
     let eval_tyenv1 = Environment.extend id (TyFun(ty_para, ty_x)) (Environment.extend para ty_para tyenv) in
     let e1_ty, e1_subst = ty_exp eval_tyenv1 e1 in
-    (* let first_subst = unify((ty_x, e1_ty) :: eqls_of_subst e1_subst) in *)
     (* second formula *)
     let eval_tyenv2 = Environment.extend id (TyFun(ty_para, ty_x)) tyenv in
     let e2_ty, e2_subst = ty_exp eval_tyenv2 e2 in
@@ -161,15 +149,13 @@ let rec ty_exp tyenv = function
     let ty2 = subst_type main_subst tyarg2 in
     (TyTuple(ty1, ty2), main_subst)
   | ProjExp(e, i) -> 
-    (let tyarg, tysubst = ty_exp tyenv e in
-     let t1 = TyVar(fresh_tyvar()) in
-     let t2 = TyVar(fresh_tyvar()) in
-     let main_subst = unify(eqls_of_subst tysubst @ [(tyarg, TyTuple(t1, t2))]) in
-     let ty1 = subst_type main_subst t1 in
-     let ty2 = subst_type main_subst t2 in
-     if i = 1 then (subst_type tysubst ty1, tysubst)
-     else if i = 2 then (subst_type tysubst ty2, tysubst)
-     else err "non valid projection target")
+    let tyarg, tysubst = ty_exp tyenv e in
+    let t1 = TyVar(fresh_tyvar ()) in
+    let t2 = TyVar(fresh_tyvar ()) in
+    let main_subst = unify(eqls_of_subst tysubst @ [(tyarg, TyTuple(t1, t2))]) in
+    if i = 1 then (subst_type main_subst t1, main_subst)
+    else if i = 2 then (subst_type main_subst t2, main_subst)
+    else err "fail"
   | _ -> err "ty_exp: not implemented"
 
 let rec ty_decl tyenv = function
