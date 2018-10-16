@@ -51,9 +51,9 @@ let rec compile prompt ichan cont =
       Arm_noreg.codegen vmcode
   in
 
-  (* Output to stdout/file *)
+  (** Output to stdout/file *)
   let ochan = if !outfile = "-" then stdout else open_out !outfile in
-  let () = output_string ochan (Arm_spec.string_of armcode ^ "\n") in
+  let () = output_string ochan ("(* [arm code] *)\n" ^ Arm_spec.string_of armcode ^ "\n") in
   if !outfile <> "-" then close_out ochan;
 
   (* continued... *)
