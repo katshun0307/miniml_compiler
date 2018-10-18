@@ -44,6 +44,7 @@ let gen_decl (Vm.ProcDecl (name, nlocal, instrs)): Arm_spec.stmt list =
     | V.BinOp(id, binop, op1, op2) -> 
       let r1 = V2 in
       let r2 = V3 in
+      append_stmt (gen_operand r1 op1 @ gen_operand r2 op2);
       (match binop with
        | S.Plus -> 
          append_stmt [Instr(Add(r1, r1, R r2)); Instr(Str(r1, local_access id))]
