@@ -1,5 +1,6 @@
 let debug = ref false
 let dprint s = if !debug then (print_string (s ()) ; flush stdout)
+let simulation = ref false
 
 let display_cfg = ref false
 let optimize = ref false
@@ -15,7 +16,6 @@ let rec compile prompt ichan cont =
 
   (* Parsing (2章) *)
   let prog = Parser.toplevel Lexer.main (Lexing.from_channel ichan) in
-  dprint (fun () -> "(* [Parsed form] *)\n" ^ Syntax.string_of_exp prog ^ "\n");
 
   (* Normal form conversion (3章) *)
   let norm = Normal.convert prog in
@@ -51,13 +51,19 @@ let rec compile prompt ichan cont =
       Arm_noreg.codegen vmcode
   in
 
-  (** Output to stdout/file *)
+  (* Output to stdout/file *)
   let ochan = if !outfile = "-" then stdout else open_out !outfile in
-  let () = output_string ochan ("(* [arm code] *)\n" ^ Arm_spec.string_of armcode ^ "\n") in
+  let () = output_string ochan (Arm_spec.string_of armcode ^ "\n") in
   if !outfile <> "-" then close_out ochan;
 
-  (* continued... *)
-  cont ()
+  if !simulation
+  then let state = Arm_simulator.simulate armcode in
+    (print_string ("\n(* [Simulation result] *)\n" ^
+                   (Arm_simulator.string_of_state state) ^ "\n");
+     flush stdout);
+
+    (* continued... *)
+    cont ()
 
 
 (* ==== main ==== *)
@@ -75,6 +81,8 @@ let aspec = Arg.align [
      " Display CFG (default: " ^ (string_of_bool !display_cfg) ^ ")");
     ("-v", Arg.Unit (fun () -> debug := true),
      " Print debug info (default: " ^ (string_of_bool !debug) ^ ")");
+    ("-s", Arg.Unit (fun () -> simulation := true),
+     " Print simulation result (default: " ^ (string_of_bool !simulation) ^ ")");
   ]
 
 let main () =
