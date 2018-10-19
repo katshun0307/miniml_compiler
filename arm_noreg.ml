@@ -84,7 +84,7 @@ let gen_decl (Vm.ProcDecl (name, nlocal, instrs)): Arm_spec.stmt list =
           (* Step12: store result *)
           Instr(Mov(result_r, R A1));
           (* Step13: reset 2 arguments *)
-          Instr(Ldr(A1, RI(Sp, 0))); Instr(Ldr(A2, RI(Sp, -4)));
+          Instr(Ldr(A1, RI(Sp, 0))); Instr(Ldr(A2, RI(Sp, 4)));
           (* move answer to specified local var *)
           Instr(Str(result_r, local_access id))
         ]
@@ -98,6 +98,7 @@ let gen_decl (Vm.ProcDecl (name, nlocal, instrs)): Arm_spec.stmt list =
     | V.Malloc(id, opl) -> 
       let alloc_size = List.length opl in
       let r = V7 in
+      let r2 = V1 in
       append_stmt(
         [Instr(Str(A1, RI(Sp, 0))); Instr(Str(A2, RI(Sp, 4)));] @ (gen_operand A1 (V.IntV alloc_size)) @ 
         [
@@ -106,32 +107,38 @@ let gen_decl (Vm.ProcDecl (name, nlocal, instrs)): Arm_spec.stmt list =
           (* Step12: store result *)
           Instr(Mov(r, R A1));
           (* Step13: reset 2 arguments *)
-          Instr(Ldr(A1, RI(Sp, 0))); Instr(Ldr(A2, RI(Sp, -4)));
-          (* move answer to specified local var *)
+          Instr(Ldr(A1, RI(Sp, 0))); Instr(Ldr(A2, RI(Sp, 4)));
+          (* move address of allocated block to specified local var *)
           Instr(Str(r, local_access id))
         ]
       );
+      (* store contents in local var *)
+      let store_stmts = List.concat(List.mapi (fun i op -> gen_operand r2 op @ [Instr(Str(r2, RI(r, 4 * i)))]) opl)
+      in append_stmt store_stmts
     | V.Read(id, op, i) -> 
       let r = V5 in
-      append_stmt ((gen_operand r op)@ [Instr(Ldr(r, mem_access r i)); Instr(Str(r, local_access id))])
+      let r2 = V6 in
+      append_stmt ((gen_operand r op)@ [Instr(Ldr(r2, mem_access r i)); Instr(Str(r2, local_access id))])
     | _ -> () (* BEGIN, END *) in
   (* convert main instrs (store to arm_stmts) *)
-  let _ = List.map stmt_instr instrs in
+  List.iter stmt_instr instrs;
+  let top = false in
   [ Dir(D_align 2); Dir(D_global name);
     Label name;
-    (* step3: save fp *)
-    Instr(Str(Fp, RI(Sp, 4)));
+  ] @
+  [(* step3: save fp *)
+    Instr(Str(Fp, RI(Sp, -4)));
     (* step4: save lr *)
-    Instr(Str(Lr, RI(Sp, 8)));
-    Instr(Sub(Sp, Fp, I 4)); Instr(Sub(Sp, Sp, I ((nlocal + 4) * 4)))] @
+    Instr(Str(Lr, RI(Sp, -8)));
+    Instr(Sub(Fp, Sp, I 4)); Instr(Sub(Sp, Sp, I ((nlocal + 4) * 4)))] @
   !arm_stmts @
   [
     Label (name ^ "_ret");
     Instr(Add(Sp, Fp, I 4)); 
     (* step8: reset return address *)
-    Instr(Ldr(Lr, RI(Fp, 8)));
+    Instr(Ldr(Lr, RI(Fp, -4)));
     (* Step10: reset fp *)
-    Instr(Ldr(Fp, RI(Fp, 4)));
+    Instr(Ldr(Fp, RI(Fp, 0)));
     Instr(Bx(Lr))
   ]
 (* placeholder *)
