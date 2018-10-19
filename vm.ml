@@ -121,11 +121,11 @@ let trans_decl (F.RecDecl (proc_name, params, body)): decl =
     | F.Fun id -> Proc(id)
     | F.IntV i -> IntV i in
   (* get number of local var (that need to be allocated) *)
-  let n_local_var = List.length(MyMap.to_list !var_alloc) in
+  let n_local_var () = List.length(MyMap.to_list !var_alloc) in
   (* <<< association between F.Var and local(id)s <<< *)
   (* >>> remember loop >>> *)
   let loop_stack = ref ([]: (id * label) list) in
-  let push_loop_stack (i, l) = print_string "pushed"; loop_stack := (i, l) :: !loop_stack in
+  let push_loop_stack (i, l) = loop_stack := (i, l) :: !loop_stack in
   let pop_loop_stack () = 
     match !loop_stack with
     | hd :: tl -> hd
@@ -165,7 +165,7 @@ let trans_decl (F.RecDecl (proc_name, params, body)): decl =
     | F.RecurExp(v) -> 
       let (id, loop_lab) = pop_loop_stack () in
       [Move(id, operand_of_val v); Goto(loop_lab)]
-  in ProcDecl(proc_name', n_local_var, trans_exp body [] ~ret:"default")
+  in ProcDecl(proc_name', n_local_var (), trans_exp body [] ~ret:"default")
 
 (* entry point *)
 let trans = List.map trans_decl
