@@ -125,7 +125,7 @@ let trans_decl (F.RecDecl (proc_name, params, body)): decl =
   (* <<< association between F.Var and local(id)s <<< *)
   (* >>> remember loop >>> *)
   let loop_stack = ref ([]: (id * label) list) in
-  let push_loop_stack (i, l) = print_string "pushed"; loop_stack := (i, l) :: !loop_stack in
+  let push_loop_stack (i, l) = loop_stack := (i, l) :: !loop_stack in
   let pop_loop_stack () = 
     match !loop_stack with
     | hd :: tl -> hd

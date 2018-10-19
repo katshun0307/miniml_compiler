@@ -152,7 +152,7 @@ let get_flat_exp ex =
       flat_exp (CompExp ce) (fun cy1 ->  
           LetExp(convert_id id, cy1, flat_exp e f))
     | C.LetRecExp(funct, idl, e1, e2) -> 
-      append_fun (List.hd idl);
+      append_fun funct;
       let letrec' = RecDecl(convert_id funct, convert_id_list idl, flat_exp e1 (fun x -> CompExp x)) in
       append_decl letrec';
       flat_exp e2 f
@@ -167,4 +167,3 @@ let get_flat_exp ex =
 let flatten exp = 
   let toplevel_content, decl_list = get_flat_exp exp in
   decl_list @ [RecDecl("_toplevel", [], toplevel_content)]
-(* [RecDecl ("_toplevel", ["p0"; "p1"], CompExp (ValExp (IntV 1))); RecDecl("hoge", ["fuga"; "piyo"], CompExp(BinOp(S.Plus, Var "fuga", Var "fuga")))] *)
