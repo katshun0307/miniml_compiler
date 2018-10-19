@@ -59,11 +59,13 @@ let gen_decl (Vm.ProcDecl (name, nlocal, instrs)): Arm_spec.stmt list =
     | V.Call(id, op, opl) -> 
       let f = List.hd opl in
       let x = List.hd (List.tl opl) in
-      let r = V6 in
+      let result_r = V6 in
       let pointer_r = V4 in
       append_stmt( 
-        (* step1: save arguments and set new ones *)
-        [Instr(Str(A1, RI(Sp, 0))); Instr(Str(A2, RI(Sp, 4)));] @ (gen_operand A1 f) @ (gen_operand A2 x) @ (gen_operand pointer_r op) @
+        (* step1: save A1, A2 registers to memory, set new arguments to A1, A2 registers *)
+        [Instr(Str(A1, RI(Sp, 0))); Instr(Str(A2, RI(Sp, 4)));] @ (gen_operand A1 f) @ (gen_operand A2 x) @
+        (* set function pointer to register r *)
+        (gen_operand pointer_r op) @
         [ 
           (* step2: jump to function head *)
           Instr(Blx(pointer_r));
@@ -80,11 +82,11 @@ let gen_decl (Vm.ProcDecl (name, nlocal, instrs)): Arm_spec.stmt list =
           (* === preprogrammed in function === *)
 
           (* Step12: store result *)
-          Instr(Mov(r, R A1));
+          Instr(Mov(result_r, R A1));
           (* Step13: reset 2 arguments *)
           Instr(Ldr(A1, RI(Sp, 0))); Instr(Ldr(A2, RI(Sp, -4)));
           (* move answer to specified local var *)
-          Instr(Str(r, local_access id))
+          Instr(Str(result_r, local_access id))
         ]
       );
     | V.Label l -> append_stmt [Label l]
