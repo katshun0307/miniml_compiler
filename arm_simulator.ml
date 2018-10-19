@@ -8,14 +8,14 @@ type reg_file = (reg * int) list
 type label_table = (label * int) list
 
 type machine_state = {
-   reg_file : reg_file;
-   stack : int array;
-   heap : int array;
-   cond_n : bool;
-   cond_z : bool;
-   label_table : label_table;
-   pc : int;
- }
+  reg_file : reg_file;
+  stack : int array;
+  heap : int array;
+  cond_n : bool;
+  cond_z : bool;
+  label_table : label_table;
+  pc : int;
+}
 
 let heap_base_address = min_int
 
@@ -29,9 +29,13 @@ let get_heap_index addr = (addr - heap_base_address) / 4
 
 let get_reg_val state reg = List.assoc reg state.reg_file
 
-let get_stack_val state addr = Array.get state.stack (get_stack_index addr)
+let get_stack_val state addr = 
+  try Array.get state.stack (get_stack_index addr)
+  with _ -> err "failed to get stack"
 
-let get_heap_val state addr = Array.get state.heap (get_heap_index addr)
+let get_heap_val state addr =
+  try Array.get state.heap (get_heap_index addr)
+  with _ -> err "failed to get heap"
 
 let get_mem_val state addr = (if addr >= 0 then get_stack_val else get_heap_val) state addr
 
@@ -47,9 +51,9 @@ let get_A1 state = get_reg_val state A1
 
 let set_reg_val state reg v =
   let rec update l k v = (match l with
-     | [] -> []
-     | (k', v') :: l' -> if k = k' then (k, v) :: l'
-                         else (k', v') :: (update l' k v))
+      | [] -> []
+      | (k', v') :: l' -> if k = k' then (k, v) :: l'
+        else (k', v') :: (update l' k v))
   in { state with reg_file = update state.reg_file reg v }
 
 let extend_stack state addr =
@@ -125,12 +129,13 @@ let run all_stmts initial_state =
          let cond_z = sub = 0 in
          step (inc_pc { state with cond_n = cond_n; cond_z = cond_z }) rest
        | Ldr (r, addr) ->
-         let mem_val = (match addr with
-          | I i -> i
-          | R r -> get_mem_val state (get_reg_val state r)
-          | RI (r, i) -> get_mem_val state ((get_reg_val state r) + i)
-          | L l -> get_label_val state l) in
-         step (inc_pc (set_reg_val state r mem_val)) rest
+         (try let mem_val = (match addr with
+              | I i -> i
+              | R r -> get_mem_val state (get_reg_val state r)
+              | RI (r, i) -> get_mem_val state ((get_reg_val state r) + i)
+              | L l -> get_label_val state l) in
+             step (inc_pc (set_reg_val state r mem_val)) rest
+          with _ -> err ("failed to load at Ldr(" ^ string_of_reg r ^ ", " ^ string_of_addr addr ^ ")" ^ "at " ^ "PC: " ^ string_of_int (state.pc) ))
        | Mov (r, addr) -> step (inc_pc (set_reg_val state r (get_addr_val state addr))) rest
        | Mul (r1, r2, addr) ->
          let r2_val = get_reg_val state r2 in
@@ -162,9 +167,9 @@ let simulate stmts =
   let (tbl, _, stmts) = analyze_label stmts in
   let initial_state = {
     reg_file =
-        [(A1, 0); (A2, 0); (A3, 0); (A4, 0);
-         (V1, 0); (V2, 0); (V3, 0); (V4, 0); (V5, 0); (V6, 0); (V7, 0);
-         (Fp, stack_base_address); (Ip, 0); (Sp, stack_base_address); (Lr, 0)];
+      [(A1, 0); (A2, 0); (A3, 0); (A4, 0);
+       (V1, 0); (V2, 0); (V3, 0); (V4, 0); (V5, 0); (V6, 0); (V7, 0);
+       (Fp, stack_base_address); (Ip, 0); (Sp, stack_base_address); (Lr, 0)];
     stack = Array.make 0 0;
     heap = Array.make 0 0;
     cond_n = false;
@@ -180,7 +185,7 @@ let string_of_heap = string_of_stack
 
 let string_of_regfile reg_file =
   List.fold_left (fun acc (reg, v) -> acc ^ string_of_reg reg ^ ": " ^ string_of_int v ^ "\n")
-                 "" reg_file
+    "" reg_file
 
 let string_of_state state =
   "[Stack]\n" ^ string_of_stack state.stack ^
