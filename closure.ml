@@ -178,7 +178,8 @@ let rec closure_exp (e: N.exp) (f: cexp -> exp) (sigma: cexp Environment.t): exp
           | _ -> err "none valid match") in
     let sigma' = make_tuple_env funct_tuple_list 0 Environment.empty in
     let closure_contents = TupleExp(funct_tuple_list) in
-    let e2' = LetExp(convert_id funct, closure_contents, closure_exp e2 f sigma') in
+    (* let e2' = LetExp(convert_id funct, closure_contents, closure_exp e2 f sigma') in *)
+    let e2' = LetExp(convert_id funct, closure_contents, closure_exp e2 f sigma) in
     LetRecExp(recpointer, [convert_id funct; convert_id id], closure_exp e1 f sigma', e2')
   | N.LoopExp(id, ce1, e2) -> 
     closure_exp (CompExp ce1) (fun y1 -> 
