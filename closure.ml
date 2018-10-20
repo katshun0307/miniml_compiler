@@ -156,9 +156,10 @@ let rec closure_exp (e: N.exp) (f: cexp -> exp) (sigma: cexp Environment.t): exp
     LetExp(new_app0, ProjExp(convert_val v1, 0), 
            f (AppExp(Var new_app0, [convert_val v1; convert_val v2])))
   | N.CompExp(N.IfExp(v, e1, e2)) -> 
-    closure_exp e1 (fun y1 -> 
+    (* closure_exp e1 (fun y1 -> 
         closure_exp e2 (fun y2 -> 
-            CompExp(IfExp(convert_val v, f y1, f y2))) sigma) sigma
+            CompExp(IfExp(convert_val v, f y1, f y2))) sigma) sigma *)
+    f (IfExp(convert_val v, closure_exp e1 (fun ce -> CompExp ce) sigma, closure_exp e2 (fun ce -> CompExp ce) sigma))
   | N.CompExp(N.TupleExp (v1, v2)) -> f(TupleExp([convert_val v1; convert_val v2]))
   | N.CompExp(N.ProjExp (v, i)) -> f(ProjExp(convert_val v, i))
   | N.LetExp(id, ce1, e2) -> 
