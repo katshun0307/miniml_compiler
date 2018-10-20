@@ -146,7 +146,7 @@ let rec closure_exp (e: N.exp) (f: cexp -> exp) (sigma: cexp Environment.t): exp
   | N.CompExp(N.ValExp(Var v)) -> 
     let may_fail v = 
       try
-        f (Environment.lookup v sigma)
+        f (Environment.lookup ("_" ^ v) sigma)
       with _ -> f (ValExp(Var ("_" ^ v)))
     in may_fail v
   | N.CompExp(N.ValExp(IntV i)) -> f (ValExp(IntV i))
@@ -166,7 +166,8 @@ let rec closure_exp (e: N.exp) (f: cexp -> exp) (sigma: cexp Environment.t): exp
         LetExp(convert_id id, y1, closure_exp e2 f sigma)) sigma
   | N.LetRecExp(funct, id, e1, e2) -> 
     let recpointer = fresh_id ("b_" ^ funct) in
-    let funct_tuple_list = (Var recpointer:: get_out_of_scope_variables e1 [id]) in
+    let out_of_scope_vars = get_out_of_scope_variables e1 [id] in
+    let funct_tuple_list = (Var recpointer:: out_of_scope_vars) in
     let rec make_tuple_env l i env =  (* make environment from id to projection to var in closure *)
       match l with 
       | Var hd:: tl ->
@@ -176,10 +177,11 @@ let rec closure_exp (e: N.exp) (f: cexp -> exp) (sigma: cexp Environment.t): exp
       | _ -> (match l with 
           | hd:: tl -> err ("unknown input in make_tuple_env" ^ "\n" ^ string_of_closure(CompExp(ValExp(hd))))
           | _ -> err "none valid match") in
-    let sigma' = make_tuple_env funct_tuple_list 0 Environment.empty in
+    let sigma' = make_tuple_env out_of_scope_vars 1 Environment.empty in
     let closure_contents = TupleExp(funct_tuple_list) in
+    let e1' = closure_exp e1 (fun ce -> CompExp(ce)) sigma' in
     let e2' = LetExp(convert_id funct, closure_contents, closure_exp e2 f sigma') in
-    LetRecExp(recpointer, [convert_id funct; convert_id id], closure_exp e1 f sigma', e2')
+    LetRecExp(recpointer, [convert_id funct; convert_id id], e1', e2')
   | N.LoopExp(id, ce1, e2) -> 
     closure_exp (CompExp ce1) (fun y1 -> 
         LoopExp(convert_id id, y1, closure_exp e2 f sigma)) sigma
