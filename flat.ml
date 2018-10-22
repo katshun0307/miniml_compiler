@@ -143,9 +143,10 @@ let get_flat_exp ex =
       f (AppExp(v', vl'))
     | C.CompExp(C.IfExp(v, e1, e2)) -> 
       let v' = convert_val v in
-      flat_exp e1 (fun y1 -> 
+      (* flat_exp e1 (fun y1 -> 
           flat_exp e2 (fun y2 -> 
-              f (IfExp(v', f y1, f y2))))
+              f (IfExp(v', f y1, f y2)))) *)
+      f (IfExp(v', flat_exp e1 (fun ce -> CompExp ce), flat_exp e2 (fun ce -> CompExp ce)))
     | C.CompExp(C.TupleExp(vl)) -> f (TupleExp(convert_val_list vl))
     | C.CompExp(C.ProjExp(v, i)) -> f (ProjExp(convert_val v, i))
     | C.LetExp(id, ce, e) -> 

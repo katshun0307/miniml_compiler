@@ -23,7 +23,7 @@ type reg =
   | Ip   (* intra-procedural call register *)
   | Sp   (* stack pointer *)
   | Lr   (* link register (return address) *)
-  (* | Pc (* program counter *) *)
+(* | Pc ( program counter ) *)
 
 (* ==== アドレッシング・モード ==== *)
 type addr =
@@ -76,7 +76,7 @@ let string_of_reg r =
   | Ip -> "ip"
   | Sp -> "sp"
   | Lr -> "lr"
-  (* | Pc -> "pc" *)
+(* | Pc -> "pc" *)
 
 let string_of_addr = function
     I i -> "#" ^ string_of_int i
@@ -88,8 +88,8 @@ let string_of_instr instr =
   let emit_instr op rands = op ^ "\t" ^ (String.concat ", " rands)
   in match instr with
     Add (r1, r2, a) ->
-      emit_instr "add" [string_of_reg r1; string_of_reg r2;
-                        string_of_addr a]
+    emit_instr "add" [string_of_reg r1; string_of_reg r2;
+                      string_of_addr a]
   | B  lbl  -> emit_instr "b"  [lbl]
   | Bl lbl  -> emit_instr "bl" [lbl]
   | Blt lbl  -> emit_instr "blt" [lbl]
@@ -98,22 +98,22 @@ let string_of_instr instr =
   | Bx  r -> emit_instr "bx"  [string_of_reg r]
   | Cmp (r, a) -> emit_instr "cmp" [string_of_reg r; string_of_addr a]
   | Ldr (r, a) ->
-      let str_of_addr =
-        (match a with
-                | L l -> "=" ^ l
-                | _ -> string_of_addr a)
-      in
-      emit_instr "ldr" [string_of_reg r; str_of_addr]
+    let str_of_addr =
+      (match a with
+       | L l -> "=" ^ l
+       | _ -> string_of_addr a)
+    in
+    emit_instr "ldr" [string_of_reg r; str_of_addr]
   | Mov (r, a) ->
-      emit_instr "mov" [string_of_reg r; string_of_addr a]
+    emit_instr "mov" [string_of_reg r; string_of_addr a]
   | Mul (r1, r2, a) ->
-      emit_instr "mul" [string_of_reg r1; string_of_reg r2;
-                        string_of_addr a]
+    emit_instr "mul" [string_of_reg r1; string_of_reg r2;
+                      string_of_addr a]
   | Str (r, a) ->
-      emit_instr "str" [string_of_reg r; string_of_addr a]
+    emit_instr "str" [string_of_reg r; string_of_addr a]
   | Sub (r1, r2, a) ->
-     emit_instr "sub" [string_of_reg r1; string_of_reg r2;
-                        string_of_addr a]
+    emit_instr "sub" [string_of_reg r1; string_of_reg r2;
+                      string_of_addr a]
 
 let string_of_directive = function
     D_align i  -> "align " ^ string_of_int i

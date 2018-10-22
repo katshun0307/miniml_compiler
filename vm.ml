@@ -98,6 +98,7 @@ let string_of_alloc (alloc: (F.id, id) MyMap.t) =
 let label_of_id (i: F.id): label = i
 
 let trans_decl (F.RecDecl (proc_name, params, body)): decl =
+  let is_toplevel = (proc_name = "_toplevel") in
   (* convert function names to label *)
   let proc_name' = label_of_id proc_name in
   (* generate new id *)
@@ -117,11 +118,23 @@ let trans_decl (F.RecDecl (proc_name, params, body)): decl =
       new_id in
   let operand_of_val v = 
     match v with
-    | F.Var id -> Local(convert_id id)
+    | F.Var id -> 
+      if not is_toplevel then 
+        (let f_pointer = List.hd params in
+         let f_arg = List.hd (List.tl params) in
+         if id = f_pointer then Param 0
+         else if id = f_arg then Param 1
+         else Local(convert_id id))
+      else Local(convert_id id)
     | F.Fun id -> Proc(id)
     | F.IntV i -> IntV i in
   (* get number of local var (that need to be allocated) *)
-  let n_local_var () = List.length(MyMap.to_list !var_alloc) in
+  let n_local_var () = 
+    let rec loop l i = 
+      match l with
+      | (_, m):: tl -> if m < i then loop tl i else loop tl m 
+      | [] -> i in
+    (loop (MyMap.to_list !var_alloc) 0) + 1 in
   (* <<< association between F.Var and local(id)s <<< *)
   (* >>> remember loop >>> *)
   let loop_stack = ref ([]: (id * label) list) in
@@ -129,7 +142,7 @@ let trans_decl (F.RecDecl (proc_name, params, body)): decl =
   let pop_loop_stack () = 
     match !loop_stack with
     | hd :: tl -> hd
-    | [] -> (114514, "temp_label") in
+    | [] -> err "reached bottom of loop stack" in
   (* <<< remember loop <<< *)
   let rec trans_cexp id ce: instr list = 
     match ce with
@@ -148,10 +161,10 @@ let trans_decl (F.RecDecl (proc_name, params, body)): decl =
     match e with
     | F.CompExp(ce) -> 
       if ret = "default" then
-        let return_id: F.id = "ret" ^ (string_of_int (fresh_id())) in
         (match ce with 
          | F.ValExp(Var id) -> accum_instr @ [Return(operand_of_val (F.Var id))]
-         | _ -> let ret_assign_instr = trans_cexp return_id ce in
+         | _ -> let return_id: F.id = "ret" ^ (string_of_int (fresh_id())) in
+           let ret_assign_instr = trans_cexp return_id ce in
            accum_instr @ ret_assign_instr @ [Return(operand_of_val (F.Var return_id))])
       else let ret_assign_instr = trans_cexp ret ce in
         accum_instr @ ret_assign_instr

@@ -150,7 +150,7 @@ let rec norm_exp (e: Syntax.exp) (f: cexp -> exp) (sigma: id Environment.t) =
         norm_exp e2 (fun y2 -> 
             LetExp(loopinit, y1, LoopExp(loopvar, ValExp(Var loopinit), f y2))) sigma') sigma' *)
     norm_exp e1 (fun y1 -> 
-        LetExp(loopinit, y1, LoopExp(loopvar, ValExp(Var loopinit), norm_exp e2 f sigma'))) sigma'
+        LetExp(loopinit, y1, LoopExp(loopvar, ValExp(Var loopinit), norm_exp e2 f sigma'))) sigma
   | RecurExp(e) -> 
     let t = fresh_id "recur" in
     norm_exp e (fun y1 -> 
