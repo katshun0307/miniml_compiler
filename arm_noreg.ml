@@ -100,14 +100,19 @@ let gen_decl (Vm.ProcDecl (name, nlocal, instrs)): Arm_spec.stmt list =
       let r = V7 in
       let r2 = V1 in
       append_stmt(
-        [Instr(Str(A1, RI(Sp, 0))); Instr(Str(A2, RI(Sp, 4)));] @ (gen_operand A1 (V.IntV alloc_size)) @ 
+        [ 
+          Instr(Str(A1, RI(Sp, 0)));
+          Instr(Str(A2, RI(Sp, 4)));
+        ] @
+        (gen_operand A1 (V.IntV alloc_size)) @
         [
           (* jump to function head *)
           Instr(Bl "mymalloc");
           (* Step12: store result *)
           Instr(Mov(r, R A1));
           (* Step13: reset 2 arguments *)
-          Instr(Ldr(A1, RI(Sp, 0))); Instr(Ldr(A2, RI(Sp, 4)));
+          Instr(Ldr(A1, RI(Sp, 0)));
+          Instr(Ldr(A2, RI(Sp, 4)));
           (* move address of allocated block to specified local var *)
           Instr(Str(r, local_access id))
         ]
@@ -118,7 +123,7 @@ let gen_decl (Vm.ProcDecl (name, nlocal, instrs)): Arm_spec.stmt list =
     | V.Read(id, op, i) -> 
       let r = V5 in
       let r2 = V6 in
-      append_stmt ((gen_operand r op)@ [Instr(Ldr(r2, mem_access r i)); Instr(Str(r2, local_access id))])
+      append_stmt ((gen_operand r op)@ [Instr(Ldr(r2, mem_access r (i - 1))); Instr(Str(r2, local_access id))])
     | _ -> () (* BEGIN, END *) in
   (* convert main instrs (store to arm_stmts) *)
   List.iter stmt_instr instrs;
