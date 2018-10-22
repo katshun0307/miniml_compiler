@@ -123,7 +123,7 @@ let gen_decl (Vm.ProcDecl (name, nlocal, instrs)): Arm_spec.stmt list =
     | V.Read(id, op, i) -> 
       let r = V5 in
       let r2 = V6 in
-      append_stmt ((gen_operand r op)@ [Instr(Ldr(r2, mem_access r (i - 1))); Instr(Str(r2, local_access id))])
+      append_stmt ((gen_operand r op)@ [Instr(Ldr(r2, mem_access r (i))); Instr(Str(r2, local_access id))])
     | _ -> () (* BEGIN, END *) in
   (* convert main instrs (store to arm_stmts) *)
   List.iter stmt_instr instrs;
