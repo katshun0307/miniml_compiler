@@ -93,14 +93,14 @@ exception UndefinedLabel of label
 exception IllegalRegister of reg
 
 type machine_state = {
-   reg_file : reg_file;
-   stack : Stack.stack;
-   heap : Heap.heap;
-   cond_n : bool;
-   cond_z : bool;
-   label_table : label_table;
-   pc : int;
- }
+  reg_file : reg_file;
+  stack : Stack.stack;
+  heap : Heap.heap;
+  cond_n : bool;
+  cond_z : bool;
+  label_table : label_table;
+  pc : int;
+}
 
 let get_reg_val state reg =
   (match List.assoc_opt reg state.reg_file with
@@ -127,8 +127,8 @@ let get_A1 state = get_reg_val state A1
 
 let set_reg_val state reg v =
   let rec update l k v = (match l with
-     | [] -> []
-     | (k', v') :: l' -> if k = k' then (k, v) :: l' else (k', v') :: (update l' k v))
+      | [] -> []
+      | (k', v') :: l' -> if k = k' then (k, v) :: l' else (k', v') :: (update l' k v))
   in { state with reg_file = update state.reg_file reg v }
 
 let set_mem_val state addr v =
@@ -154,6 +154,7 @@ let run all_stmts initial_state =
   let rec step state = function
     | [] -> state
     | (Instr instr) :: rest ->
+      print_string (string_of_instr instr ^ "\n");
       (match instr with
        | Add (r1, r2, addr) ->
          let r2_val = get_reg_val state r2 in
@@ -186,10 +187,10 @@ let run all_stmts initial_state =
          step (inc_pc { state with cond_n = cond_n; cond_z = cond_z }) rest
        | Ldr (r, addr) ->
          let mem_val = (match addr with
-          | I i -> i
-          | R r -> get_mem_val state (get_reg_val state r)
-          | RI (r, i) -> get_mem_val state ((get_reg_val state r) + i)
-          | L l -> get_label_val state l) in
+             | I i -> i
+             | R r -> get_mem_val state (get_reg_val state r)
+             | RI (r, i) -> get_mem_val state ((get_reg_val state r) + i)
+             | L l -> get_label_val state l) in
          step (inc_pc (set_reg_val state r mem_val)) rest
        | Mov (r, addr) -> step (inc_pc (set_reg_val state r (get_addr_val state addr))) rest
        | Mul (r1, r2, addr) ->
@@ -223,9 +224,9 @@ let simulate stmts =
   let (tbl, _, stmts) = analyze_label stmts in
   let initial_state = {
     reg_file =
-        [(A1, 0); (A2, 0); (A3, 0); (A4, 0);
-         (V1, 0); (V2, 0); (V3, 0); (V4, 0); (V5, 0); (V6, 0); (V7, 0);
-         (Fp, StackBaseAddr.value); (Ip, 0); (Sp, StackBaseAddr.value); (Lr, 0)];
+      [(A1, 0); (A2, 0); (A3, 0); (A4, 0);
+       (V1, 0); (V2, 0); (V3, 0); (V4, 0); (V5, 0); (V6, 0); (V7, 0);
+       (Fp, StackBaseAddr.value); (Ip, 0); (Sp, StackBaseAddr.value); (Lr, 0)];
     stack = Stack.make 0;
     heap = Heap.make 0;
     cond_n = false;
@@ -237,7 +238,7 @@ let simulate stmts =
 
 let string_of_regfile reg_file =
   List.fold_left (fun acc (reg, v) -> acc ^ string_of_reg reg ^ ": " ^ string_of_int v ^ "\n")
-                 "" reg_file
+    "" reg_file
 
 let string_of_state state =
   "[Stack]\n" ^ Stack.to_string state.stack ^
