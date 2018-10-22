@@ -98,6 +98,7 @@ let run all_stmts initial_state =
   let rec step state = function
     | [] -> state
     | (Instr instr) :: rest ->
+      print_string (string_of_instr instr ^ "\n");
       (match instr with
        | Add (r1, r2, addr) ->
          let r2_val = get_reg_val state r2 in
