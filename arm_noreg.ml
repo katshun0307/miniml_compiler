@@ -122,7 +122,6 @@ let gen_decl (Vm.ProcDecl (name, nlocal, instrs)): Arm_spec.stmt list =
     | _ -> () (* BEGIN, END *) in
   (* convert main instrs (store to arm_stmts) *)
   List.iter stmt_instr instrs;
-  let top = false in
   [ Dir(D_align 2); Dir(D_global name);
     Label name;
   ] @

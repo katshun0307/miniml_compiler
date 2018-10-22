@@ -129,7 +129,12 @@ let trans_decl (F.RecDecl (proc_name, params, body)): decl =
     | F.Fun id -> Proc(id)
     | F.IntV i -> IntV i in
   (* get number of local var (that need to be allocated) *)
-  let n_local_var () = List.length(MyMap.to_list !var_alloc) in
+  let n_local_var () = 
+    let rec loop l i = 
+      match l with
+      | (_, m):: tl -> if m < i then loop tl i else loop tl m 
+      | [] -> i in
+    (loop (MyMap.to_list !var_alloc) 0) + 1 in
   (* <<< association between F.Var and local(id)s <<< *)
   (* >>> remember loop >>> *)
   let loop_stack = ref ([]: (id * label) list) in
@@ -137,7 +142,7 @@ let trans_decl (F.RecDecl (proc_name, params, body)): decl =
   let pop_loop_stack () = 
     match !loop_stack with
     | hd :: tl -> hd
-    | [] -> (114514, "temp_label") in
+    | [] -> err "reached bottom of loop stack" in
   (* <<< remember loop <<< *)
   let rec trans_cexp id ce: instr list = 
     match ce with
