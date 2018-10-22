@@ -1,45 +1,121 @@
 open Arm_spec
 
-exception Error of string
-let err s = raise (Error s)
-let impl_err () = err "Implementation Error"
+type addr = int
+
+exception UninitializedMemory of addr
+exception UninitializedStack of addr
+exception UnallocatedHeap of addr
+exception SegmentationFault of addr
+exception ImplementationError
+
+module type BaseAddr = sig val value : addr end
+module StackBaseAddr : BaseAddr = struct let value = max_int end
+module HeapBaseAddr : BaseAddr = struct let value = min_int end
+
+module type Memory = sig
+  type memval
+  type memory
+  val base_address : addr
+  val abs_address : addr -> addr
+  val length : memory -> addr
+  val make : addr -> memory
+  val get : memory -> addr -> int
+  val set : memory -> addr -> int -> memory
+  val extend : memory -> addr -> memory
+  val fold_left : ('a -> memval -> 'a) -> 'a -> memory -> 'a
+  val to_string : memory -> string
+end
+
+module Make_Memory (B : BaseAddr) : Memory =
+struct
+  type memval = int option
+  type memory = memval array
+  let base_address = B.value
+  let abs_address addr = abs (base_address - addr)
+  let calc_index addr = abs_address addr / 4
+  let make addr = Array.make (addr / 4) None
+  let length memory = Array.length memory * 4
+  let get memory addr =
+    match Array.get memory (calc_index addr) with
+    | Some n -> n
+    | None -> raise (UninitializedMemory addr)
+  let set memory addr v = Array.set memory (calc_index addr) (Some v); memory
+  let extend memory addr = Array.append memory (Array.make (addr / 4) None)
+  let fold_left = Array.fold_left
+  let to_string =
+    let string_of_option = function
+      | Some n -> string_of_int n
+      | None   -> "undef" in
+    Array.fold_left (fun acc v -> acc ^ (string_of_option v) ^ "\n") ""
+end
+
+module StackMemory : Memory = Make_Memory(StackBaseAddr)
+module Stack = struct
+  type stack = StackMemory.memory
+  let make = StackMemory.make
+  let load stack addr =
+    let addr' = StackMemory.abs_address addr in
+    if 0 <= addr' && addr' < StackMemory.length stack
+    then StackMemory.get stack addr
+    else raise (UninitializedStack addr)
+  let store stack addr v =
+    let addr' = StackMemory.abs_address addr in
+    let stack = (if StackMemory.length stack <= addr'
+                 then StackMemory.extend stack (addr' - StackMemory.length stack + 4)
+                 else stack) in
+    StackMemory.set stack addr v
+  let to_string = StackMemory.to_string
+end
+
+module HeapMemory : Memory = Make_Memory(HeapBaseAddr)
+module Heap = struct
+  type heap = HeapMemory.memory
+  let make = HeapMemory.make
+  let load heap addr =
+    let addr' = HeapMemory.abs_address addr in
+    if 0 <= addr' && addr' < HeapMemory.length heap
+    then HeapMemory.get heap addr
+    else raise (UnallocatedHeap addr)
+  let store heap addr v =
+    let addr' = HeapMemory.abs_address addr in
+    if 0 <= addr' && addr' < HeapMemory.length heap
+    then HeapMemory.set heap addr v
+    else raise (SegmentationFault addr)
+  let tail_address heap = HeapMemory.base_address + HeapMemory.length heap
+  let malloc heap addr = HeapMemory.extend heap addr
+  let to_string = HeapMemory.to_string
+end
 
 type reg_file = (reg * int) list
 type label_table = (label * int) list
 
+exception UndefinedLabel of label
+exception IllegalRegister of reg
+
 type machine_state = {
-  reg_file : reg_file;
-  stack : int array;
-  heap : int array;
-  cond_n : bool;
-  cond_z : bool;
-  label_table : label_table;
-  pc : int;
-}
+   reg_file : reg_file;
+   stack : Stack.stack;
+   heap : Heap.heap;
+   cond_n : bool;
+   cond_z : bool;
+   label_table : label_table;
+   pc : int;
+ }
 
-let heap_base_address = min_int
+let get_reg_val state reg =
+  (match List.assoc_opt reg state.reg_file with
+   | None -> raise (IllegalRegister reg)
+   | Some n -> n)
 
-let stack_base_address = max_int
+let get_mem_val state addr =
+  if addr >= 0
+  then Stack.load state.stack addr
+  else Heap.load state.heap addr
 
-let get_heap_tail_address state = heap_base_address + (Array.length state.heap) * 4
-
-let get_stack_index addr = (stack_base_address - addr) / 4
-
-let get_heap_index addr = (addr - heap_base_address) / 4
-
-let get_reg_val state reg = List.assoc reg state.reg_file
-
-let get_stack_val state addr = 
-  try Array.get state.stack (get_stack_index addr)
-  with _ -> err "failed to get stack"
-
-let get_heap_val state addr =
-  try Array.get state.heap (get_heap_index addr)
-  with _ -> err "failed to get heap"
-
-let get_mem_val state addr = (if addr >= 0 then get_stack_val else get_heap_val) state addr
-
-let get_label_val state l = List.assoc l state.label_table
+let get_label_val state l =
+  (match List.assoc_opt l state.label_table with
+   | None -> raise (UndefinedLabel l)
+   | Some n -> n)
 
 let get_addr_val state = function
   | I i -> i
@@ -51,34 +127,14 @@ let get_A1 state = get_reg_val state A1
 
 let set_reg_val state reg v =
   let rec update l k v = (match l with
-      | [] -> []
-      | (k', v') :: l' -> if k = k' then (k, v) :: l'
-        else (k', v') :: (update l' k v))
+     | [] -> []
+     | (k', v') :: l' -> if k = k' then (k, v) :: l' else (k', v') :: (update l' k v))
   in { state with reg_file = update state.reg_file reg v }
 
-let extend_stack state addr =
-  { state with stack = Array.append state.stack (Array.make (addr / 4) 0) }
-
-let extend_heap state addr =
-  { state with heap = Array.append state.heap (Array.make (addr / 4) 0) }
-
-let set_stack_val state addr v =
-  let i = get_stack_index addr in
-  let state =
-    if Array.length state.stack <= i
-    then extend_stack state ((i - Array.length state.stack + 1) * 4)
-    else state in
-  Array.set state.stack i v; state
-
-let set_heap_val state addr v =
-  let i = get_heap_index addr in
-  let state =
-    if Array.length state.heap <= i
-    then extend_heap state ((i - Array.length state.heap + 1) * 4)
-    else state in
-  Array.set state.heap i v; state
-
-let set_mem_val state addr v = (if addr >= 0 then set_stack_val else set_heap_val) state addr v
+let set_mem_val state addr v =
+  if addr >= 0
+  then { state with stack = Stack.store state.stack addr v }
+  else { state with heap = Heap.store state.heap addr v }
 
 let rec fetch_instr stmts addr =
   if addr = 0 then stmts else fetch_instr (List.tl stmts) (addr-1)
@@ -98,7 +154,6 @@ let run all_stmts initial_state =
   let rec step state = function
     | [] -> state
     | (Instr instr) :: rest ->
-      print_string (string_of_instr instr ^ "\n");
       (match instr with
        | Add (r1, r2, addr) ->
          let r2_val = get_reg_val state r2 in
@@ -130,13 +185,12 @@ let run all_stmts initial_state =
          let cond_z = sub = 0 in
          step (inc_pc { state with cond_n = cond_n; cond_z = cond_z }) rest
        | Ldr (r, addr) ->
-         (try let mem_val = (match addr with
-              | I i -> i
-              | R r -> get_mem_val state (get_reg_val state r)
-              | RI (r, i) -> get_mem_val state ((get_reg_val state r) + i)
-              | L l -> get_label_val state l) in
-             step (inc_pc (set_reg_val state r mem_val)) rest
-          with _ -> err ("failed to load at Ldr(" ^ string_of_reg r ^ ", " ^ string_of_addr addr ^ ")" ^ "at " ^ "PC: " ^ string_of_int (state.pc) ))
+         let mem_val = (match addr with
+          | I i -> i
+          | R r -> get_mem_val state (get_reg_val state r)
+          | RI (r, i) -> get_mem_val state ((get_reg_val state r) + i)
+          | L l -> get_label_val state l) in
+         step (inc_pc (set_reg_val state r mem_val)) rest
        | Mov (r, addr) -> step (inc_pc (set_reg_val state r (get_addr_val state addr))) rest
        | Mul (r1, r2, addr) ->
          let r2_val = get_reg_val state r2 in
@@ -150,15 +204,16 @@ let run all_stmts initial_state =
          let r2_val = get_reg_val state r2 in
          let addr_val = get_addr_val state addr in
          step (inc_pc (set_reg_val state r1 (r2_val - addr_val))) rest)
-    | _ -> impl_err ()
+    | _ -> raise ImplementationError
   and jump state l =
     if l = "_toplevel_ret" then (state, []) else
     if l = "mymalloc"
     then
       let a1_val = get_reg_val state A1 in
-      let ret_val = get_heap_tail_address state in
+      let ret_val = Heap.tail_address state.heap in
       let pc = get_reg_val state Lr in
-      let state = set_reg_val (extend_heap state a1_val) A1 ret_val in
+      let state = { state with heap = Heap.malloc state.heap (a1_val * 4)} in
+      let state = set_reg_val state A1 ret_val in
       (set_pc state pc, fetch_instr all_stmts pc)
     else
       let pc = get_label_val state l in (set_pc state pc, fetch_instr all_stmts pc) in
@@ -168,11 +223,11 @@ let simulate stmts =
   let (tbl, _, stmts) = analyze_label stmts in
   let initial_state = {
     reg_file =
-      [(A1, 0); (A2, 0); (A3, 0); (A4, 0);
-       (V1, 0); (V2, 0); (V3, 0); (V4, 0); (V5, 0); (V6, 0); (V7, 0);
-       (Fp, stack_base_address); (Ip, 0); (Sp, stack_base_address); (Lr, 0)];
-    stack = Array.make 0 0;
-    heap = Array.make 0 0;
+        [(A1, 0); (A2, 0); (A3, 0); (A4, 0);
+         (V1, 0); (V2, 0); (V3, 0); (V4, 0); (V5, 0); (V6, 0); (V7, 0);
+         (Fp, StackBaseAddr.value); (Ip, 0); (Sp, StackBaseAddr.value); (Lr, 0)];
+    stack = Stack.make 0;
+    heap = Heap.make 0;
     cond_n = false;
     cond_z = false;
     label_table = tbl;
@@ -180,15 +235,11 @@ let simulate stmts =
   } in
   run stmts (set_pc initial_state (get_label_val initial_state "_toplevel"))
 
-let string_of_stack = Array.fold_left (fun acc n -> acc ^ (string_of_int n) ^ "\n") ""
-
-let string_of_heap = string_of_stack
-
 let string_of_regfile reg_file =
   List.fold_left (fun acc (reg, v) -> acc ^ string_of_reg reg ^ ": " ^ string_of_int v ^ "\n")
-    "" reg_file
+                 "" reg_file
 
 let string_of_state state =
-  "[Stack]\n" ^ string_of_stack state.stack ^
-  "\n[Heap]\n" ^ string_of_heap state.heap ^
+  "[Stack]\n" ^ Stack.to_string state.stack ^
+  "\n[Heap]\n" ^ Heap.to_string state.heap ^
   "\n[Register file]\n" ^ string_of_regfile state.reg_file
