@@ -132,9 +132,10 @@ let get_out_of_scope_variables (e: N.exp) (included: N.id list): value list =
         | LetExp(i, cex, ex) -> 
           MySet.union (loop_ce cex accum incl) (loop_e ex accum (i::incl))
         | LoopExp(i, cex, ex) -> 
-          MySet.union (loop_ce cex accum incl) (loop_e ex accum incl)
+          MySet.union (loop_ce cex accum (i:: incl)) (loop_e ex accum (i:: incl))
         | LetRecExp(i1, i2, e1, e2) -> 
           MySet.union (loop_e e1 accum (i2::incl)) (loop_e e2 accum (i2::incl))
+        | CompExp(ce) -> loop_ce ce accum incl
         | _ -> accum
       )
   in
@@ -161,7 +162,7 @@ let rec closure_exp (e: N.exp) (f: cexp -> exp) (sigma: cexp Environment.t): exp
             CompExp(IfExp(convert_val v, f y1, f y2))) sigma) sigma *)
     f (IfExp(convert_val v, closure_exp e1 (fun ce -> CompExp ce) sigma, closure_exp e2 (fun ce -> CompExp ce) sigma))
   | N.CompExp(N.TupleExp (v1, v2)) -> f(TupleExp([convert_val v1; convert_val v2]))
-  | N.CompExp(N.ProjExp (v, i)) -> f(ProjExp(convert_val v, i))
+  | N.CompExp(N.ProjExp (v, i)) -> f(ProjExp(convert_val v, i-1)) (* {1, 2} -> {0, 1} *)
   | N.LetExp(id, ce1, e2) -> 
     closure_exp (CompExp ce1) (fun y1 -> 
         LetExp(convert_id id, y1, closure_exp e2 f sigma)) sigma
