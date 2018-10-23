@@ -3,13 +3,11 @@
 
 extern int _toplevel();
 
-void *mymalloc(int n)
-{
+void *mymalloc(int n) {
   return malloc(n * sizeof(int));
 }
 
-int main()
-{
+int main() {
   printf("%d\n", _toplevel());
   return 0;
 }

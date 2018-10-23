@@ -9,6 +9,7 @@
 *.o
 *.s
 *~
+_build*
 *.dot
 *.dvi
 *.toc
