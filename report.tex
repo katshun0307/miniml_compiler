@@ -1,48 +1,49 @@
-% 計算機科学実験Ⅳ
-% 1029-28-9483 勝田 峻太朗
-% \西暦 \today
+\input{default}
 
-# 課題1 (拡張構文: 任意)
+\begin{document}
 
-> 階乗計算を行うMiniMLプログラムを,再帰を用いずloop構文と組を使って書きなさい.同じく,フィボナッチ数を求めるプログラムを,loop 構文と組を使って書きなさい.
+\title{計算機科学実験Ⅳ レポート1}
+\author{1029-28-9483 勝田 峻太朗}
+\date{\today}
+\maketitle
 
-## 階乗計算
+\section*{課題1 (拡張構文: 任意)}
 
-```{.ocaml .numberLines startFrom="1"}
-(* calculate factorial *)
-let fact n =
-loop v = (n, 1) in
-if v.1 > 1 then
-recur (v.1 - 1, v.2 * v.1)
-else v.2
-```
+\subsection*{階乗計算}
 
-## フィボナッチ数
+\begin{lstlisting}[caption=階乗計算]
+    let fact n =
+    loop v = (n, 1) in
+    if v.1 > 1 then
+    recur (v.1 - 1, v.2 * v.1)
+    else v.2
+\end{lstlisting}
 
-```{.ocaml .numberLines startFrom="1"}
-(* calculate the fibonacci number *)
-let fib n = 
-loop v = (n, (1, 0)) in
-if v.1 > 1 then 
-let tmp1 = v.2.1 in
-let tmp2 = v.2.1 + v.2.2 in
-recur (v.1 - 1, (tmp2, tmp1))
-else v.2.1 + v.2.2
-```
+\subsection*{フィボナッチ数}
 
-# 課題2 (フロントエンド: 必須)
+\begin{lstlisting}[caption=フィボナッチ数の計算]
+    let fib n = 
+    loop v = (n, (1, 0)) in
+    if v.1 > 1 then 
+    let tmp1 = v.2.1 in
+    let tmp2 = v.2.1 + v.2.2 in
+    recur (v.1 - 1, (tmp2, tmp1))
+    else v.2.1 + v.2.2
+\end{lstlisting}
 
-> MiniMLの文法規則に従うMiniMLプログラムを入力とし,以下の `syntax.ml` により定義される抽象構文木を返す字句解析器・構文解析器を作成しなさい.
+\section*{課題2 (フロントエンド: 必須)}
+
+\begin{quotation}
+MiniMLの文法規則に従うMiniMLプログラムを入力とし,以下の \lstinline{syntax.ml} により定義される抽象構文木を返す字句解析器・構文解析器を作成しなさい.
+\end{quotation}
 
 字句解析器・構文解析器ともに実験Ⅲの実装を参考にした.
 
-## 字句解析器
+\subsection*{字句解析器}
 
 課題にない実装として,コメントアウト機能を実装した.
 
-#### `lexer.mll`
-
-```{.ocaml .numberLines startFrom="1"}
+\begin{lstlisting}[caption=lexer.mll]
 let reservedWords = [
   (* Keywords *)
   ("else", Parser.ELSE);
@@ -80,18 +81,15 @@ and comment i = parse
   | "*)" { if i = 1 then main lexbuf else comment (i-1) lexbuf }
   | "(*" { comment (i+1) lexbuf }
   | _ {comment i lexbuf}
-```
+\end{lstlisting}
 
-## 構文解析器
+\subsection*{構文解析器}
 
 以下のようにコードを追加し,構文解析器を作成した.
-`LetRecExp`は,`let rec f = fun x -> e1 in e2`以外にも`let rec f x = e1 in e2`の表現にも対応した.
+\lstinline{LetRecExp}は,\lstinline{let rec f = fun x -> e1 in e2}以外にも\lstinline{let rec f x = e1 in e2}の表現にも対応した.
 
-#### `parser.mly`
-
-```{.diff .numberLines startFrom="1"}
-open Syntax
-
+\begin{lstlisting}[caption=parser.mliへの変更, language=diff]
+ open Syntax
  %}
 
 -%token LPAREN RPAREN SEMISEMI RARROW
@@ -106,7 +104,7 @@ Expr :
    | e=LetExpr    { e }
    | e=LetRecExpr { e }
    | e=LTExpr     { e }
-+  | e=LoopExpr   { e }
+  | e=LoopExpr   { e }
 
  LTExpr :
      e1=PExpr LT e2=PExpr { BinOp (Lt, e1, e2) }
@@ -142,49 +140,50 @@ FunExpr :
            LetRecExp (i, p, e1, e2) }
 +
 +LoopExpr :
-+  LOOP id=ID EQ e1=Expr IN e2=Expr { LoopExp (id, e1, e2) }
-```
++  LOOP id=ID EQ e1=Expr IN e2=Expr { LoopExp (id, e1, e2) }   
+\end{lstlisting}
 
-# 課題3 (インタプリタ･型推論: 任意)
+\section*{課題3 (インタプリタ･型推論: 任意)}
 
-> 実験3で作成した $ML^4$ 言語のインタプリタと型推論器を基に,MiniML言語のインタプリタと型推論器を作成しなさい.
+\begin{quotation}
+実験3で作成した $ML^4$ 言語のインタプリタと型推論器を基に,MiniML言語のインタプリタと型推論器を作成しなさい.
+\end{quotation}
 
 インタプリタ･型推論器ともに実験Ⅲを参考に作成した.
 
-## `loop`, `recur` 式への対応
+\subsection*{loop, recur式への対応}
 
-`loop`式,`recur`式は`let rec`式のsyntax sugarとみなせるため,これらはすべてインタプリタ･型推論器に通す前に`let rec`式に変換した.
+\lstinline{loop}式,\lstinline{recur}式は\lstinline{let rec}式のsyntax sugarとみなせるため,これらはすべてインタプリタ･型推論器に通す前に\lstinline{let rec}式に変換した.
 
 一般的に,
-$$ loop\ v\ = e_1\ in\ e_2 $$
-は, 新しい変数`f`を用いて,
-$$ let\ rec\ f\ v = e_{2 [recur\ e \rightarrow f\ e]}\ in\ f\ e_1 $$
+$ loop\ v\ = e_1\ in\ e_2 $
+は, 新しい変数$f$を用いて,
+$ let\ rec\ f\ v = e_{2 [recur\ e \rightarrow f\ e]}\ in\ f\ e_1 $
 
 と表現できる.
 
 例えば,
 
-```ocaml
+\begin{lstlisting}
 loop v = (1, 0) in
  if v.1 < 101 
  then recur (v.1 + 1, v.1 + v.2) 
  else v.2;;
-```
+\end{lstlisting}
+
 は,
 
-```ocaml
+\begin{lstlisting}
 let rec f = fun v -> 
 if v.1 < 101 then f (v.1 + 1, v.1 + v.2) 
 else v.2
-```
+\end{lstlisting}
 
 に変換される.
 
 この操作を構文解析後の段階で,インタプリタ･型推論器に入る前に実装した.
 
-#### `main.ml`
-
-```{.ocaml .numberLines startFrom="5"}
+\begin{lstlisting}[caption=main.ml]
 (* create fresh variable *)
 let fresh_loopvar = 
   let counter = ref 0 in
@@ -233,31 +232,27 @@ let rec read_eval_print env tyenv =
     let ty, new_tyenv = ty_decl tyenv decl' in
     let (id, newenv, v) = eval_decl env decl' in
     ...
-```
+\end{lstlisting}
 
-## インタプリタ
+\subsection*{インタプリタ}
 
-インタプリタでは,新しい表現である`tuple`と`proj`に対応した.
+インタプリタでは, 新しい表現である \lstinline{tuple}と\lstinline{proj} に対応した.
 
-まず,新しい`tuple`データ型を追加した.
+まず,新しい\lstinline{tuple}データ型を追加した.
 
-#### `eval.ml`
+\begin{lstlisting}
+    type exval =
+    | IntV of int
+    | BoolV of bool
+    | TupleV of exval * exval
+    | ProcV of id * exp * dnval Environment.t ref
+  and dnval = exval 
+\end{lstlisting}
 
-```{.ocaml .numberLines}
-type exval =
-  | IntV of int
-  | BoolV of bool
-  | TupleV of exval * exval
-  | ProcV of id * exp * dnval Environment.t ref
-and dnval = exval
-```
+また, \lstinline{eval_exp} に対応する項目を追加した.
 
-また,`eval_exp`に対応する項目を追加した.
-
-#### `eval.ml`
-
-```{.ocaml .numberLines}
-let rec eval_exp env = function
+\begin{lstlisting}[caption=eval.mlの追加コード]
+    let rec eval_exp env = function
 ...
 | TupleExp(e1, e2) -> 
     let v1 = eval_exp env e1 in
@@ -270,15 +265,13 @@ let rec eval_exp env = function
        else err "ProjExp: index not valid"
     | _ -> err "error: projection of non-tuple")
   | _ -> err "eval_exp: should not enter this match"
-```
+\end{lstlisting}
 
-## 型推論器
+\subsection*{型推論器}
 
-型推論器にも,`tuple`と`proj`の型推論を追加した.
+型推論器にも, \lstinline{tuple} と \lstinline{proj} の型推論を追加した.
 
-#### `typing.ml`
-
-```{.ocaml .numberLines}
+\begin{lstlisting}[caption=typing.ml]
   | TupleExp(e1, e2) -> 
     let tyarg1, tysubst1 = ty_exp tyenv e1 in
     let tyarg2, tysubst2 = ty_exp tyenv e2 in
@@ -294,18 +287,17 @@ let rec eval_exp env = function
     if i = 1 then (subst_type main_subst t1, main_subst)
     else if i = 2 then (subst_type main_subst t2, main_subst)
     else err "fail"
-```
+\end{lstlisting}
 
-# 課題4 (recur式の検査: 必須)
+\section*{課題4 (recur式の検査: 必須)}
+\begin{quotation}
+syntax.ml 中の recur\_check 関数を完成させることにより, recur式の検査を実装しなさい. parser.mly 中の呼び出している箇所を見ると分かるとおり, recur\_check 関数は unit 型の値を返す.末尾位置ではないところに書かれた recur 式を発見したら,即座に例外を投げコンパイル処理を中断すること.
+\end{quotation}
 
-> `syntax.ml` 中の `recur_check` 関数を完成させることにより,recur式の検査を実装しなさい. `parser.mly` 中の呼び出している箇所を見ると分かるとおり, `recur_check` 関数は `unit` 型の値を返す.末尾位置ではないところに書かれた `recur` 式を発見したら,即座に例外を投げコンパイル処理を中断すること.
+recur\_check の内部に, Syntax.expと,その expression が末尾位置であるかを示すis\_tail を引数に取る再帰関数を定義し, recur式が正しい位置にあるかどうか確認する.
 
-`recur_check`の内部に,`Syntax.exp`と,その expression が末尾位置であるかを示す`is_tail`を引数に取る再帰関数を定義し,`recur`式が正しい位置にあるかどうか確認する.
-
-#### `normal.ml`
-
-```{.ocaml .numberLines startFrom="163"}
-(* ==== recur式が末尾位置にのみ書かれていることを検査 ==== *)
+\begin{lstlisting}[caption=normal.ml]
+* ==== recur式が末尾位置にのみ書かれていることを検査 ==== *)
 (* task4: S.exp -> unit *)
 let rec recur_check e is_tail: unit =   
   let recur_err () = err "illegal usage of recur" in
@@ -338,56 +330,65 @@ let rec recur_check e is_tail: unit =
 let rec convert prog =
   recur_check prog false;
   normalize prog
-```
+\end{lstlisting}
 
-## 実行例
+\subsection*{実行例}
 
-```
+\begin{lstlisting}[caption=実行例]
 # loop v = (1, 0) in
 if v.1 < 101 then
   (fun x -> recur x) (v.1 + 1, v.1 + v.2)
 else
   v.2;;
 Fatal error: exception Normal.Error("illegal usage of recur")
-```
+\end{lstlisting}
 
-# 課題5 (正規形への変換: 必須)
+このように,無効な位置にrecur式のあるプログラムは実行しない.
 
-> 言語Cへの変換と,正規形への変換を同時に行う,`normal.ml` 中の `norm_exp` 関数を完成させよ.
+\section*{課題5 (正規形への変換: 必須)}
 
-正規形への変換は, `norm_exp`関数に実装した. `norm_exp` の引数`sigma`は, `LetExp`や`LetRecExp`を変換する過程で,新しく生成した`Normal.id`と`Syntax.id`の対応関係を保持するためのものである.
+\begin{quotation}
+言語$C$ への変換と正規形への変換を同時に行う,normal.ml 中の norm\_exp 関数を完成させよ.
+\end{quotation}
+
+正規形への変換は, norm\_exp関数に実装した. norm\_exp の引数sigmaは, LetExpやLetRecExpを変換する過程で,新しく生成したNormal.idとSyntax.idの対応関係を保持するためのものである.
 
 実装は以下の通り.
 
-#### `normal.ml`
-
-```{.ocaml .numberLines}
+\begin{lstlisting}[caption=normal.mlの実装]
 (* ==== 正規形への変換 ==== *)
 let rec norm_exp (e: Syntax.exp) (f: cexp -> exp) (sigma: id Environment.t) = 
+  let smart_fresh_id s e sigma: id = 
+    (match e with
+     | S.Var id -> Environment.lookup id sigma
+     | _ -> fresh_id s)
+  in
   match e with
   | S.Var i -> 
     let maybe_fail i = 
       try f(ValExp(Var(Environment.lookup i sigma)))
-      with Environment.Not_bound -> 
+      with Environment.Not_bound -> (* should not enter here *)
         f (ValExp(Var ("_" ^ i ^ "temp"))) 
     in maybe_fail i 
   | S.ILit i ->  f (ValExp (IntV i))
   | S.BLit b -> f (ValExp (IntV (int_of_bool b)))
   | BinOp(op, e1, e2) -> 
-    let x1 = fresh_id "bin" in
-    let x2 = fresh_id "bin" in
+    let x1 = smart_fresh_id "bin" e1 sigma in
+    let x2 = smart_fresh_id "bin" e2 sigma in
     (norm_exp e1 (fun x ->
          (norm_exp e2 (fun y ->
               (LetExp(x2, y, LetExp(x1, x, f (BinOp(op, Var x1, Var x2))))))) sigma) sigma)
   | IfExp(cond, e1, e2) -> 
     let x = fresh_id "if" in
+    (* norm_exp e1 (fun y ->
+        LetExp(x, y, f (IfExp(Var x, f y, norm_exp e2 f sigma)))) sigma *)
     norm_exp cond (fun condy -> 
         LetExp(x, condy, f (IfExp(Var x, norm_exp e1 (fun x -> CompExp x) sigma, norm_exp e2 (fun x -> CompExp x) sigma)))) sigma
   | LetExp(id, e1, e2) -> 
     let t1 = fresh_id "let" in
     let sigma' = Environment.extend id t1 sigma in
-    norm_exp e1 (fun y1 -> 
-        LetExp(t1, y1, norm_exp e2 f sigma')) sigma
+    norm_exp e1 (fun y1 ->
+        LetExp(t1, y1, norm_exp e2 f sigma')) sigma'
   | FunExp(id, e) -> 
     let funf = fresh_id "funf" in
     let funx = fresh_id "funx" in
@@ -409,8 +410,11 @@ let rec norm_exp (e: Syntax.exp) (f: cexp -> exp) (sigma: id Environment.t) =
     let loopvar = fresh_id "loopval" in
     let loopinit = fresh_id "loopinit" in
     let sigma' = Environment.extend id loopvar sigma in
+    (* norm_exp e1 (fun y1 -> 
+        norm_exp e2 (fun y2 -> 
+            LetExp(loopinit, y1, LoopExp(loopvar, ValExp(Var loopinit), f y2))) sigma') sigma' *)
     norm_exp e1 (fun y1 -> 
-        LetExp(loopinit, y1, LoopExp(loopvar, ValExp(Var loopinit), norm_exp e2 f sigma'))) sigma'
+        LetExp(loopinit, y1, LoopExp(loopvar, ValExp(Var loopinit), norm_exp e2 f sigma'))) sigma
   | RecurExp(e) -> 
     let t = fresh_id "recur" in
     norm_exp e (fun y1 -> 
@@ -425,11 +429,13 @@ let rec norm_exp (e: Syntax.exp) (f: cexp -> exp) (sigma: id Environment.t) =
     let t = fresh_id "proj" in
     norm_exp e (fun y -> 
         LetExp(t, y, f (ProjExp(Var t, i)))) sigma
-```
 
-## `LetExp`の実装
+and normalize e = norm_exp e (fun ce -> CompExp ce) Environment.empty
+\end{lstlisting}
 
-`LetExp`の正規化においては,$\text{let } x = e_1 \text{ in } e_2$ は,以下のように書き換えできる.
+\subsection*{LetExpの実装}
+
+LetExpの正規化においては,$\text{let } x = e_1 \text{ in } e_2$ は,以下のように書き換えできる.
 ただし,$[\cdot]$ は,正規変換を表すものとする.
 
 $$
@@ -437,23 +443,24 @@ $$
 \text{let } t_1 = [e_1] \text{ in } [e_2]_{(x \rightarrow t_1)}
 $$
 
+
 また,実装は,
 
-```ocaml
+\begin{lstlisting}
 let t1 = fresh_id "let" in
     let sigma' = Environment.extend id t1 sigma in
     norm_exp e1 (fun y1 -> 
         LetExp(t1, y1, norm_exp e2 f sigma')) sigma
-```
+\end{lstlisting}
 
 となっている.
 
-`norm_exp e2 f sigma'`が `e1`のようにLetExpの外部ではなく,内部に記述されているのは,
-`e2`は, `x` が `e1` に束縛された環境のもとで評価される必要があるため, `e2`の正規形はすべてLet式の内部に存在する必要がある為である.
+\lstinline{norm_exp e2 f sigma'} が e1のようにLetExpの外部ではなく,内部に記述されているのは,
+e2は, x がe1に束縛された環境のもとで評価される必要があるため,e2の正規形はすべてLet式の内部に存在する必要がある為である.
 
-## `LetRecExp`の実装
+\subsection*{LetRecExpの実装}
 
-```ocaml
+\begin{lstlisting}
 | FunExp(id, e) -> 
     let funf = fresh_id "funf" in
     let funx = fresh_id "funx" in
@@ -466,40 +473,43 @@ let t1 = fresh_id "let" in
     let recx = fresh_id "recx" in
     let sigma' = Environment.extend funct recf (Environment.extend id recx sigma) in
     LetRecExp(recf, recx, norm_exp e1 (fun ce -> CompExp ce) sigma, norm_exp e2 f sigma')
-```
+\end{lstlisting}
 
-Fun式 `fun x -> e` は, LetRec式に以下ののように変換できるので, Fun式の実装はLetRec式と同じ様になっている.
+Fun式 \lstinline{fun x -> e} は, LetRec式に以下ののように変換できるので, Fun式の実装はLetRec式と同じ様になっている.
 
-```ocaml
+\begin{lstlisting}
 let rec f x = e in f
-```
+\end{lstlisting}
 
-LetRec式`let rec f x = e1 in e2`の正規形では, 
+LetRec式\lstinline{let rec f x = e1 in e2}の正規形では, 
 
-+ `e1`はそれまでの文脈とは独立に変換されるべきであり, 第2引数に`f`を用いず`fun ce -> CompExp ce`を用いて,
-`norm_exp e1 (fun ce -> CompExp ce) sigma'` と変換している.  また`e1`内で`x`を含む可能性があるので,既存の変換に,`x`と`funx`の対応を追加した`sigma'`を渡している.
+\begin{itemize}
 
-+ `e2` は, 内部で`f`を参照する可能性があるので,既存の変換に,`f`と`funf`の対応を追加した`sigma'`を渡している.
+\item e1はそれまでの文脈とは独立に変換されるべきであり, 第2引数にfを用いず\lstinline{fun ce -> CompExp ce}を用いて,
+\lstinline{norm_exp e1 (fun ce -> CompExp ce) sigma'} と変換している.  またe1内でxを含む可能性があるので,既存の変換に,xとfunxの対応を追加したsigma'を渡している.
 
-また,`e1`, `e2`ともに正規形のものが, `LetRec`式の内部に存在する必要があるので, 他の実装とは異なり,`norm_exp`の呼び出しが`LetRec`式内部に来るようになっている.
+\item e2 は, 内部でfを参照する可能性があるので,既存の変換に,fとfunfの対応を追加したsigma'を渡している.
 
+\end{itemize}
 
-# 課題6 (クロージャ変換: 必須)
+また,e1, e2ともに正規形のものが, LetRec式の内部に存在する必要があるので, 他の実装とは異なり,norm\_expの呼び出しがLetRec式内部に来るようになっている.
 
-> `closure.ml` の `convert` 関数を完成させることにより, クロージャ変換を実装しなさい.
+\section*{課題6 (クロージャ変換: 必須)}
+
+\begin{quotation}
+closure.ml の convert 関数を完成させることにより, クロージャ変換を実装しなさい.
+\end{quotation}
 
 クロージャ変換は,以下のように実装した.
 
-#### `closure.ml`
-
-```{.ocaml .numberLines}
+\begin{lstlisting}[caption=closure.ml]
 (* === conversion to closed normal form === *)
 let rec closure_exp (e: N.exp) (f: cexp -> exp) (sigma: cexp Environment.t): exp = 
   match e with
   | N.CompExp(N.ValExp(Var v)) -> 
     let may_fail v = 
       try
-        f (Environment.lookup v sigma)
+        f (Environment.lookup ("_" ^ v) sigma)
       with _ -> f (ValExp(Var ("_" ^ v)))
     in may_fail v
   | N.CompExp(N.ValExp(IntV i)) -> f (ValExp(IntV i))
@@ -509,30 +519,33 @@ let rec closure_exp (e: N.exp) (f: cexp -> exp) (sigma: cexp Environment.t): exp
     LetExp(new_app0, ProjExp(convert_val v1, 0), 
            f (AppExp(Var new_app0, [convert_val v1; convert_val v2])))
   | N.CompExp(N.IfExp(v, e1, e2)) -> 
-    closure_exp e1 (fun y1 -> 
+    (* closure_exp e1 (fun y1 -> 
         closure_exp e2 (fun y2 -> 
-            CompExp(IfExp(convert_val v, f y1, f y2))) sigma) sigma
+            CompExp(IfExp(convert_val v, f y1, f y2))) sigma) sigma *)
+    f (IfExp(convert_val v, closure_exp e1 (fun ce -> CompExp ce) sigma, closure_exp e2 (fun ce -> CompExp ce) sigma))
   | N.CompExp(N.TupleExp (v1, v2)) -> f(TupleExp([convert_val v1; convert_val v2]))
-  | N.CompExp(N.ProjExp (v, i)) -> f(ProjExp(convert_val v, i))
+  | N.CompExp(N.ProjExp (v, i)) -> f(ProjExp(convert_val v, i-1)) (* {1, 2} -> {0, 1} *)
   | N.LetExp(id, ce1, e2) -> 
     closure_exp (CompExp ce1) (fun y1 -> 
         LetExp(convert_id id, y1, closure_exp e2 f sigma)) sigma
   | N.LetRecExp(funct, id, e1, e2) -> 
     let recpointer = fresh_id ("b_" ^ funct) in
-    let funct_tuple_list = (Var recpointer:: get_out_of_scope_variables e1 [id]) in
-    let rec make_tuple_env l i env =  
+    let out_of_scope_vars = get_out_of_scope_variables e1 [id] in
+    let funct_tuple_list = (Var recpointer:: out_of_scope_vars) in
+    let rec make_tuple_env l i env =  (* make environment from id to projection to var in closure *)
       match l with 
       | Var hd:: tl ->
         let env' =  Environment.extend hd (ProjExp(convert_val (Var funct), i)) env in
         make_tuple_env tl (i+1) env'
       | [] -> env
       | _ -> (match l with 
-          | hd:: tl -> err ("unknown input in make_tuple_env" ^ string_of_closure(CompExp(ValExp(hd))))
+          | hd:: tl -> err ("unknown input in make_tuple_env" ^ "\n" ^ string_of_closure(CompExp(ValExp(hd))))
           | _ -> err "none valid match") in
-    let sigma' = make_tuple_env funct_tuple_list 0 Environment.empty in
+    let sigma' = make_tuple_env out_of_scope_vars 1 Environment.empty in
     let closure_contents = TupleExp(funct_tuple_list) in
+    let e1' = closure_exp e1 (fun ce -> CompExp(ce)) sigma' in
     let e2' = LetExp(convert_id funct, closure_contents, closure_exp e2 f sigma') in
-    LetRecExp(recpointer, [convert_id funct; convert_id id], closure_exp e1 f sigma', e2')
+    LetRecExp(recpointer, [convert_id funct; convert_id id], e1', e2')
   | N.LoopExp(id, ce1, e2) -> 
     closure_exp (CompExp ce1) (fun y1 -> 
         LoopExp(convert_id id, y1, closure_exp e2 f sigma)) sigma
@@ -540,16 +553,20 @@ let rec closure_exp (e: N.exp) (f: cexp -> exp) (sigma: cexp Environment.t): exp
 
 (* entry point *)
 let convert e = closure_exp e (fun ce -> CompExp ce) Environment.empty
-```
+\end{lstlisting}
 
-## LetRec式の実装
+\subsection*{LetRecExpの実装}
 
-### 関数クロージャに必要な変数の発見
+\subsubsection*{関数クロージャに必要な変数の発見}
 
-関数クロージャに必要な参照範囲外の変数を発見するため,`get_out_of_scope_variables`関数を定義した. この関数は,探索対象の`N.exp`を`e`として受け取り, すでにスコープに入っている変数名を`included`で受け取り, スコープ外の変数を`list`で返す.
+関数クロージャに必要な参照範囲外の変数を発見するため,
+get\_out\_of\_scope\_variables関数を定義した.
+この関数は,探索対象のN.expをeとして受け取り, 
+すでにスコープに入っている変数名をincludedで受け取り,
+スコープ外の変数をlistで返す.
 
-```{.ocaml .numberLines}
-let get_out_of_scope_variables (e: N.exp) (included: N.id list): value list = 
+\begin{lstlisting}[caption=スコープ外変数の発見]
+  let get_out_of_scope_variables (e: N.exp) (included: N.id list): value list = 
   let rec loop_e ex accum incl = 
     let rec loop_ce cex caccum incl = 
       N.(match cex with
@@ -567,52 +584,59 @@ let get_out_of_scope_variables (e: N.exp) (included: N.id list): value list =
         | LetExp(i, cex, ex) -> 
           MySet.union (loop_ce cex accum incl) (loop_e ex accum (i::incl))
         | LoopExp(i, cex, ex) -> 
-          MySet.union (loop_ce cex accum incl) (loop_e ex accum incl)
+          MySet.union (loop_ce cex accum (i:: incl)) (loop_e ex accum (i:: incl))
         | LetRecExp(i1, i2, e1, e2) -> 
           MySet.union (loop_e e1 accum (i2::incl)) (loop_e e2 accum (i2::incl))
+        | CompExp(ce) -> loop_ce ce accum incl
         | _ -> accum
       )
   in
-  List.map convert_val (MySet.to_list (loop_e e MySet.empty included))
-```
+  List.map convert_val (MySet.to_list (loop_e e MySet.empty included))  
+\end{lstlisting}
 
+\subsubsection*{関数クロージャの生成と関数本体式の変換}
 
-### 関数クロージャの生成と関数本体式の変換
+得られたスコープ外変数が,関数本体式内で正しくクロージャの要素として参照されるような変換を施すため, make\_tuple\_env 関数を用いて,変数とProjExpを対応付ける環境を生成する.
 
-得られたスコープ外変数が,関数本体式内で正しくクロージャの要素として参照されるような変換を施すため, `make_tuple_env`関数を用いて,変数と`ProjExp`を対応付ける環境を生成する.
+例えば, get\_out\_of\_scope\_variablesで得られたスコープ外変数の列が,
 
-例えば, `get_out_of_scope_variables`で得られたスコープ外変数の列が,
+\begin{lstlisting}
+  [Var "x"; Var "y"; Var "z"]
+\end{lstlisting}
 
-```ocaml
-[Var "x"; Var "y"; Var "z"]
-```
+であった場合, make\_tuple\_envは,
 
-であった場合, `make_tuple_env`は,
+環境sigma'
 
-環境`sigma'`
+\begin{lstlisting}
+  [(Var "x", funct.1); (Var "y", funct.2); (Var "z", funct.3)]
+\end{lstlisting}
 
-```ocaml
-[(Var "x", funct.1); (Var "y", funct.2); (Var "z", funct.3)]
-```
 を生成する.
 
-これを用いて関数雨本体式を`closure_exp`で変換することで,関数本体式の変数はクロージャを参照するようになる.
+これを用いて関数雨本体式をclosure\_expで変換することで,関数本体式の変数はクロージャを参照するようになる.
 
-### 全体の流れ
+また,このクラージャ変換の段階で,もとの言語での\lstinline{ProjExp}は,最初の要素を取り出すのに $1$を使っていたが,ここからすべて$0$で統一する.
+
+\subsubsection*{全体の流れ}
 
 LetRec式においては, 関数のidだけだったものが,関数クロージャと関数ポインターの2つが必要になる. 
 
 そこで,以下のような操作をしている.
 
-1. 関数ポインターを`recpointer`に,`fresh_id ("b_" ^ funct)`で生成する.(関数クロージャは関数名を引き継ぐ.)
-2. `funct_tuple_list`に,`get_out_of_scope_variables`を用いて,クロージャに必要な値を代入する.
-3. 関数本体式内でクロージャのインデックスを用いてスコープ外変数を参照しなければいけないので, 自由変数とクロージャからインデックスで値を取り出す表現の対応を`make_tuple_env`を用いて生成し,`sigma'`代入する.
+\begin{enumerate}
+\item 関数ポインターをrecpointerに,\lstinline{fresh_id ("b_" ^ funct)}で生成する.(関数クロージャは関数名を引き継ぐ.) (ただし\lstinline{funct}は関数名)
 
-```{.ocaml .numberLines}
+\item funct\_tuple\_listに,get\_out\_of\_scope\_variablesを用いて,クロージャに必要な値を代入する.
+\item 関数本体式内でクロージャのインデックスを用いてスコープ外変数を参照しなければいけないので, 自由変数とクロージャからインデックスで値を取り出す表現の対応をmake\_tuple\_envを用いて生成し,sigma'代入する.
+\end{enumerate}
+
+\begin{lstlisting}[caption=LetRec式の実装]
 | N.LetRecExp(funct, id, e1, e2) -> 
     let recpointer = fresh_id ("b_" ^ funct) in
-    let funct_tuple_list = (Var recpointer:: get_out_of_scope_variables e1 [id]) in
-    let rec make_tuple_env l i env = 
+    let out_of_scope_vars = get_out_of_scope_variables e1 [id] in
+    let funct_tuple_list = (Var recpointer:: out_of_scope_vars) in
+    let rec make_tuple_env l i env =  (* make environment from id to projection to var in closure *)
       match l with 
       | Var hd:: tl ->
         let env' =  Environment.extend hd (ProjExp(convert_val (Var funct), i)) env in
@@ -621,32 +645,34 @@ LetRec式においては, 関数のidだけだったものが,関数クロージ
       | _ -> (match l with 
           | hd:: tl -> err ("unknown input in make_tuple_env" ^ "\n" ^ string_of_closure(CompExp(ValExp(hd))))
           | _ -> err "none valid match") in
-    let sigma' = make_tuple_env funct_tuple_list 0 Environment.empty in
+    let sigma' = make_tuple_env out_of_scope_vars 1 Environment.empty in
     let closure_contents = TupleExp(funct_tuple_list) in
+    let e1' = closure_exp e1 (fun ce -> CompExp(ce)) sigma' in
     let e2' = LetExp(convert_id funct, closure_contents, closure_exp e2 f sigma') in
-    LetRecExp(recpointer, [convert_id funct; convert_id id], closure_exp e1 f sigma', e2')
-```
+    LetRecExp(recpointer, [convert_id funct; convert_id id], e1', e2')
+\end{lstlisting}
 
-## AppExpの変換
+\subsection*{AppExpの変換}
 
 AppExpでは,関数のクロージャではなく,クロージャの第一要素である関数ポインタに対して関数適用することになる. 
 
 よって, 呼び出す関数のポインタを新しい変数に代入し, それに対して関数適用することとなる. 
 関数クロージャから関数ポインタを得るには,関数クロージャの先頭要素を取れば良い.
 
-```ocaml
+\begin{lstlisting}[caption=AppExpの実装]
 | N.CompExp(N.AppExp(v1, v2)) -> 
     let new_app0 = fresh_id "closure_app" in
     LetExp(new_app0, ProjExp(convert_val v1, 0), 
            f (AppExp(Var new_app0, [convert_val v1; convert_val v2])))
-```
+\end{lstlisting}
 
+\section*{課題7 (平滑化: 必須)}
 
-# 課題7 (平滑化: 必須)
+\begin{quotation}
+flat.mlのflatten関数を完成させることにより，正規形コードを平滑化しなさい.
+\end{quotation}
 
-> `flat.ml`の`flatten`関数を完成させることにより，正規形コードを平滑化しなさい.
-
-```{.ocaml .numberLines}
+\begin{lstlisting}
 (* ==== フラット化：変数参照と関数参照の区別も同時に行う ==== *)
 let convert_id (i: C.id): id = i 
 let convert_id_list (il: C.id list): id list = il
@@ -678,9 +704,10 @@ let get_flat_exp ex =
       f (AppExp(v', vl'))
     | C.CompExp(C.IfExp(v, e1, e2)) -> 
       let v' = convert_val v in
-      flat_exp e1 (fun y1 -> 
+      (* flat_exp e1 (fun y1 -> 
           flat_exp e2 (fun y2 -> 
-              f (IfExp(v', f y1, f y2))))
+              f (IfExp(v', f y1, f y2)))) *)
+      f (IfExp(v', flat_exp e1 (fun ce -> CompExp ce), flat_exp e2 (fun ce -> CompExp ce)))
     | C.CompExp(C.TupleExp(vl)) -> f (TupleExp(convert_val_list vl))
     | C.CompExp(C.ProjExp(v, i)) -> f (ProjExp(convert_val v, i))
     | C.LetExp(id, ce, e) -> 
@@ -702,46 +729,52 @@ let get_flat_exp ex =
 let flatten exp = 
   let toplevel_content, decl_list = get_flat_exp exp in
   decl_list @ [RecDecl("_toplevel", [], toplevel_content)]
-```
+\end{lstlisting}
 
-## `LetRec`式の取り出しと`Fun`変数型への対応
+\subsection*{LetRec式の取り出しとFun変数型への対応}
 
 以下のポインタを定義し,変換をする.
 
-+ `fun_list`
-: `Fun`変数型へ対応するために,関数へのポインタの集合を追加していく. `convert_val`では, idが`fun_list`に存在すれば`Fun`変数型に変換され, そうでなければ`Var`型に変換される.
+\begin{itemize}
 
-+ `decl_list`
-: `LetRec`式を入れ子から取り出し,並べるため,`decl_list`に追加していく.
+\item[fun\_list]
+Fun変数型へ対応するために,関数へのポインタの集合を追加していく. convert\_valでは, idがfun\_listに存在すればFun変数型に変換され, そうでなければVar型に変換される.
+
+\item[decl\_list]
+LetRec式を入れ子から取り出し,並べるため,decl\_listに追加していく.
+\end{itemize}
 
 LetRec式の平滑化処理は次のように行う.
 
-1. 関数ポインタのidを`fun_list`に追加する.
-2. 平滑化したLetRec関数を取り出し, `decl_list`に追加する.
-3. 続きの`exp`を`flat_exp`に適応する.
+\begin{enumerate}
 
-## 返り値
+\item 関数ポインタのidをfun\_listに追加する.
+\item 平滑化したLetRec関数を取り出し, decl\_listに追加する.
+\item 続きのexpをflat\_expに適応する.
+\end{enumerate}
 
-`decl_list`と,残った式を,以下のように`decl list`にして返す.
+\subsection*{返り値}
 
-```ocaml
+decl\_listと,残った式を,以下のように \lstinline{decl list}にして返す.
+
+\begin{lstlisting}
 let flatten exp = 
   let toplevel_content, decl_list = get_flat_exp exp in
   decl_list @ [RecDecl("_toplevel", [], toplevel_content)]
-```
+\end{lstlisting}
 
-# 課題8 (仮想機械コード生成: 必須)
+\section*{課題8 (仮想機械コード生成: 必須)}
 
-> `vm.ml`の`trans`関数を完成させることにより，フラット表現から仮想機械コードへの変換を実現しなさい.
+\begin{quotation}
+vm.mlのtrans関数を完成させることにより，フラット表現から仮想機械コードへの変換を実現しなさい.
+\end{quotation}
 
-#### `vm.ml`
-
-```{.ocaml .numberLines}
+\begin{lstlisting}[caption=vm.ml]
 (* ==== 仮想機械コードへの変換 ==== *)
-
 let label_of_id (i: F.id): label = i
 
 let trans_decl (F.RecDecl (proc_name, params, body)): decl =
+  let is_toplevel = (proc_name = "_toplevel") in
   (* convert function names to label *)
   let proc_name' = label_of_id proc_name in
   (* generate new id *)
@@ -761,11 +794,23 @@ let trans_decl (F.RecDecl (proc_name, params, body)): decl =
       new_id in
   let operand_of_val v = 
     match v with
-    | F.Var id -> Local(convert_id id)
+    | F.Var id -> 
+      if not is_toplevel then 
+        (let f_pointer = List.hd params in
+         let f_arg = List.hd (List.tl params) in
+         if id = f_pointer then Param 0
+         else if id = f_arg then Param 1
+         else Local(convert_id id))
+      else Local(convert_id id)
     | F.Fun id -> Proc(id)
     | F.IntV i -> IntV i in
   (* get number of local var (that need to be allocated) *)
-  let n_local_var () = List.length(MyMap.to_list !var_alloc) in
+  let n_local_var () = 
+    let rec loop l i = 
+      match l with
+      | (_, m):: tl -> if m < i then loop tl i else loop tl m 
+      | [] -> i in
+    (loop (MyMap.to_list !var_alloc) 0) + 1 in
   (* <<< association between F.Var and local(id)s <<< *)
   (* >>> remember loop >>> *)
   let loop_stack = ref ([]: (id * label) list) in
@@ -773,7 +818,7 @@ let trans_decl (F.RecDecl (proc_name, params, body)): decl =
   let pop_loop_stack () = 
     match !loop_stack with
     | hd :: tl -> hd
-    | [] -> (114514, "temp_label") in
+    | [] -> err "reached bottom of loop stack" in
   (* <<< remember loop <<< *)
   let rec trans_cexp id ce: instr list = 
     match ce with
@@ -792,10 +837,10 @@ let trans_decl (F.RecDecl (proc_name, params, body)): decl =
     match e with
     | F.CompExp(ce) -> 
       if ret = "default" then
-        let return_id: F.id = "ret" ^ (string_of_int (fresh_id())) in
         (match ce with 
          | F.ValExp(Var id) -> accum_instr @ [Return(operand_of_val (F.Var id))]
-         | _ -> let ret_assign_instr = trans_cexp return_id ce in
+         | _ -> let return_id: F.id = "ret" ^ (string_of_int (fresh_id())) in
+           let ret_assign_instr = trans_cexp return_id ce in
            accum_instr @ ret_assign_instr @ [Return(operand_of_val (F.Var return_id))])
       else let ret_assign_instr = trans_cexp ret ce in
         accum_instr @ ret_assign_instr
@@ -813,52 +858,82 @@ let trans_decl (F.RecDecl (proc_name, params, body)): decl =
 
 (* entry point *)
 let trans = List.map trans_decl
-```
+\end{lstlisting}
 
-## 補助的な値,関数
+\subsection*{補助的な値,関数}
 
-`var_alloc: (F.id, id) MyMap.t`
-: 平滑化後の`id`と,`Vm.id`の関係を保持する. 変換後のこのMapの長さが,必要なlocal変数の数となる.
+\begin{description}
 
-`convert_id: F.id -> id`
-: `id`の変換を行う. `var_alloc`にすでに変換が存在すればそれを返し,
-なければ,新しい`id`を生成し,`var_alloc`に記録する.
+\item[$var\_alloc: (F.id, id) MyMap.t$] \hfill \\
+平滑化後のidと,Vm.idの関係を保持する. 変換後のこのMapを用いて,必要なlocal変数の数を調べる.(var\_allocに入っているidの最大値+1がそれである.)
 
-`operand_of_val: F.value -> operand`
-: 値の変換を行う.
+\item[$convert\_id: F.id \rightarrow id$] \hfill \\
+idの変換を行う. var\_allocにすでに変換が存在すればそれを返し,
+なければ,新しいidを生成し,var\_allocに記録する.
 
-`loop_stack`
-: 現在どのloop文にいるかを保持する.
-\
-`trans_cexp: F.id -> F.cexp -> instr list`
-: cexpの変換を行う.  `F.cexp`を`F.id`に代入するような命令列を生成する.
+\item[$operand\_of\_val: F.value \rightarrow operand$] \hfill \\
+値の変換を行う. 以下で詳しく説明する
 
-## `Vm.exp`への変換
+\item[$loop\_stack$] \hfill \\
+現在どのloop文にいるかを保持する.
 
-変換は,`trans_exp`で行う.
+\item[$trans\_cexp: F.id \rightarrow F.cexp \rightarrow instr list$] \hfill \\
+cexpの変換を行う. F.cexpをF.idに代入するような命令列を生成する.
+\end{description}
 
-### 引数
+\subsection*{vm.expへの変換}
 
-`e: F.exp`
-: 変換対象の`F.exp`
+変換は,trans\_expで行う.
 
-`accum_instr: inst\subsur list`
-: `toplevel`に来る表現を持ち回るための引数.
-[]
-`ret: F.id`
-: 変換後の表現が返り値となる場合,`"default"`が入れられ,
-変換後の表現があるid`が代入される場合はそのidが入力される.
+\subsubsection*{引数}
 
-### `F.CompExp`の変換
+\begin{description}
 
-`trans_exp`に`F.CompExp(cexp)`が入力されたとき
+\item[$e: F.exp$] \hfill \\
+変換対象のF.exp
 
-1. `ret="default"`であったとき
+\item[$accum\_instr: instr list$] \hfill \\
+toplevelに来る表現を持ち回るための引数.
 
-    `Return`を通じて,`cexp`が返り値となる.
+\item[$ret: F.id$] \hfill \\
+変換後の表現が返り値となる場合,"default"が入れられ,
+変換後の表現があるidが代入される場合はそのidが入力される.
+\end{description}
 
-2. `ret="some_id"`であったとき,
+\subsubsection*{F.CompExpの変換}
 
-    `trans_cexp`を用いて,`cexp`を`some_id`に代入する 命令列を生成する.
+trans\_expにF.CompExp(cexp)が入力されたとき
+
+\begin{enumerate}
+
+\item ret="default"であったとき
+
+    Returnを通じて,cexpが返り値となる.
+
+\item ret="some\_id"であったとき,
+
+    trans\_cexpを用いて,cexpをsome\_idに代入する 命令列を生成する.
+    
+\end{enumerate}
 
 
+\subsection*{値の変換$operand\_of\_val: F.value \rightarrow operand$}
+
+$operand\_of\_val$では,$F.value$を,$operand$ に変換する.
+
+\begin{description}
+
+\item[$F.Var\ id$] \hfill \\
+$var_alloc$変換が存在すれば,その変換を返せば良い.
+しかし,toplevel以外での関数式の内部では,$param$に変換しなければいけない.
+よって,toplevel以外では,現在変換している関数宣言のパラメータを確認し,その場合は$param$型の$operand$を返さなければいけない.
+
+\item[$F.Fun\ id$] \hfill \\
+関数へのポインタが入っているので,$proc$型へ変換しなければいけない.
+
+\item[$F.IntV\ i$] \hfill \\
+即値が入ってるので,そのまま$IntV$型へ変換すれば良い.
+
+\end{description}
+
+\end{document}
