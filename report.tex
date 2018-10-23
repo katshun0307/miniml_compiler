@@ -616,7 +616,7 @@ get\_out\_of\_scope\_variables関数を定義した.
 
 これを用いて関数雨本体式をclosure\_expで変換することで,関数本体式の変数はクロージャを参照するようになる.
 
-また,このクラージャ変換の段階で,もとの言語での\lstinline{ProjExp}は,最初の要素を取り出すのに $1$を使っていたが,ここからすべて$0$で統一する.
+また,このクロージャ変換の段階で,もとの言語での\lstinline{ProjExp}は,最初の要素を取り出すのに $1$を使っていたが,ここからすべて$0$で統一する.
 
 \subsubsection*{全体の流れ}
 
@@ -924,7 +924,7 @@ $operand\_of\_val$では,$F.value$を,$operand$ に変換する.
 \begin{description}
 
 \item[$F.Var\ id$] \hfill \\
-$var_alloc$変換が存在すれば,その変換を返せば良い.
+$var\_alloc$変換が存在すれば,その変換を返せば良い.
 しかし,toplevel以外での関数式の内部では,$param$に変換しなければいけない.
 よって,toplevel以外では,現在変換している関数宣言のパラメータを確認し,その場合は$param$型の$operand$を返さなければいけない.
 
