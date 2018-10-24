@@ -44,6 +44,7 @@ let gen_decl (Vm.ProcDecl (name, nlocal, instrs)): Arm_spec.stmt list =
     | V.BinOp(id, binop, op1, op2) -> 
       let r1 = V2 in
       let r2 = V3 in
+      let r3 = V4 in
       append_stmt (gen_operand r1 op1 @ gen_operand r2 op2);
       (match binop with
        | S.Plus -> 
@@ -54,7 +55,19 @@ let gen_decl (Vm.ProcDecl (name, nlocal, instrs)): Arm_spec.stmt list =
          let label1: label = fresh_label "label" in
          let label2: label = fresh_label "label" in
          append_stmt [Instr(Cmp(r1, R r2)); Instr(Blt(label1)); Instr(Mov(r1, I 0)); Instr(B label2);
-                      Label(label1); Instr(Mov(r1, I 1)); Label(label2); Instr(Str(r1, local_access id))]);
+                      Label(label1); Instr(Mov(r1, I 1)); Label(label2); Instr(Str(r1, local_access id))]
+       | S.And -> 
+         let label1: label = fresh_label "label" in
+         let label2: label = fresh_label "label" in
+         append_stmt [Instr(Add(r3, r1, R r2)); Instr(Cmp(r3, I 2)); Instr(Blt(label1));
+                      Instr(Mov(r1, I 1)); Instr(B label2);
+                      Label(label1); Instr(Mov(r1, I 0)); Label(label2); Instr(Str(r1, local_access id))]
+       | S.Or -> 
+         let label1: label = fresh_label "label" in
+         let label2: label = fresh_label "label" in
+         append_stmt [Instr(Add(r3, r1, R r2)); Instr(Cmp(r3, I 1)); Instr(Blt(label1));
+                      Instr(Mov(r1, I 1)); Instr(B label2);
+                      Label(label1); Instr(Mov(r1, I 0)); Label(label2); Instr(Str(r1, local_access id))]);
     | V.Goto l -> append_stmt [Instr(B l)]
     | V.Call(id, op, opl) -> 
       let f = List.hd opl in

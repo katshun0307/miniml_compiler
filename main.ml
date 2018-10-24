@@ -75,6 +75,8 @@ let usage = "Usage: " ^ Sys.argv.(0) ^ " [-vOG] [-o ofile] [file]"
 let aspec = Arg.align [
     ("-o", Arg.Set_string outfile,
      " Set output file (default: stdout)");
+     ("-i", Arg.Set_string srcfile,
+          " Set input file (default: stdin)");
     ("-O", Arg.Unit (fun () -> optimize := true),
      " Perform optimization (default: " ^ (string_of_bool !optimize) ^ ")");
     ("-G", Arg.Unit (fun () -> display_cfg := true),

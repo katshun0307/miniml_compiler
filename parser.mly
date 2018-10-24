@@ -4,7 +4,7 @@ open Syntax
 %}
 
 %token LPAREN RPAREN SEMISEMI RARROW COMMA DOT
-%token PLUS MULT LT EQ
+%token PLUS MULT LT EQ AND OR
 %token IF THEN ELSE TRUE FALSE LET IN FUN REC LOOP RECUR
 
 %token <int> INTV
@@ -22,8 +22,16 @@ Expr :
   | e=FunExpr    { e }
   | e=LetExpr    { e }
   | e=LetRecExpr { e }
-  | e=LTExpr     { e }
+  | e=ORExpr     { e }
   | e=LoopExpr   { e }
+
+ORExpr : (* or *)
+    l=ANDExpr OR r=ANDExpr { BinOp (Or, l, r) }
+  | e=ANDExpr { e }
+
+ANDExpr : (* and *)
+    l=LTExpr AND r=ANDExpr { BinOp (And, l, r) }
+  | e=LTExpr { e }
 
 LTExpr :
     e1=PExpr LT e2=PExpr { BinOp (Lt, e1, e2) }
@@ -53,7 +61,7 @@ AExpr :
 
 IfExpr :
     IF e1=Expr THEN e2=Expr ELSE e3=Expr { IfExp (e1, e2, e3) }
-
+ 
 LetExpr :
     LET i=ID EQ e1=Expr IN e2=Expr { LetExp (i, e1, e2) }
 

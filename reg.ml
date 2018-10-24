@@ -47,6 +47,9 @@ let string_of_binop = function
     Syntax.Plus -> "add"
   | Syntax.Mult -> "mul"
   | Syntax.Lt   -> "lt"
+  | Syntax.And   -> "and"
+  | Syntax.Or   -> "or"
+
 
 let string_of_dest = function
     R r -> "r" ^ string_of_int r
@@ -60,36 +63,36 @@ let string_of_operand = function
 
 let string_of_instr idt tab = function
     Move (t, v) ->
-      idt ^ "move" ^ tab ^ "r" ^ string_of_int t ^ ", " ^
-      string_of_operand v
+    idt ^ "move" ^ tab ^ "r" ^ string_of_int t ^ ", " ^
+    string_of_operand v
   | Load (r, oft) ->
-      idt ^ "load" ^ tab ^ "r" ^ string_of_int r ^ ", t" ^
-      string_of_int oft
+    idt ^ "load" ^ tab ^ "r" ^ string_of_int r ^ ", t" ^
+    string_of_int oft
   | Store (r, oft) ->
-      idt ^ "store" ^ tab ^ "r" ^ string_of_int r ^ ", t" ^
-      string_of_int oft
+    idt ^ "store" ^ tab ^ "r" ^ string_of_int r ^ ", t" ^
+    string_of_int oft
   | BinOp (t, op, v1, v2) ->
-      idt ^ string_of_binop op ^ tab ^ "r" ^ string_of_int t ^ ", " ^
-      string_of_operand v1 ^ ", " ^ string_of_operand v2
+    idt ^ string_of_binop op ^ tab ^ "r" ^ string_of_int t ^ ", " ^
+    string_of_operand v1 ^ ", " ^ string_of_operand v2
   | Label lbl -> lbl ^ ":"
   | BranchIf (v, lbl) ->
-      idt ^ "bif" ^ tab ^ string_of_operand v ^ ", " ^ lbl
+    idt ^ "bif" ^ tab ^ string_of_operand v ^ ", " ^ lbl
   | Goto lbl ->
-      idt ^ "goto" ^ tab ^ lbl
+    idt ^ "goto" ^ tab ^ lbl
   | Call (dst, tgt, [a0; a1]) ->
-      idt ^ "call" ^ tab ^ string_of_dest dst ^ ", " ^
-      string_of_operand tgt ^
-      "(" ^ string_of_operand a0 ^ ", " ^ string_of_operand a1 ^ ")"
+    idt ^ "call" ^ tab ^ string_of_dest dst ^ ", " ^
+    string_of_operand tgt ^
+    "(" ^ string_of_operand a0 ^ ", " ^ string_of_operand a1 ^ ")"
   | Call (_, _, args) -> err ("Illegal number of arguments: " ^
                               string_of_int (List.length args))
   | Return v ->
-      idt ^ "ret" ^ tab ^ string_of_operand v
+    idt ^ "ret" ^ tab ^ string_of_operand v
   | Malloc (t, vs) ->
-      idt ^ "new" ^ tab ^ string_of_dest t ^ " [" ^
-      (String.concat ", " (List.map string_of_operand vs)) ^ "]"
+    idt ^ "new" ^ tab ^ string_of_dest t ^ " [" ^
+    (String.concat ", " (List.map string_of_operand vs)) ^ "]"
   | Read (t, v, i) ->
-      idt ^ "read" ^ tab ^ string_of_dest t ^ " #" ^
-      string_of_int i ^ "(" ^ string_of_operand v ^ ")"
+    idt ^ "read" ^ tab ^ string_of_dest t ^ " #" ^
+    string_of_int i ^ "(" ^ string_of_operand v ^ ")"
 
 let string_of_decl (ProcDecl (lbl, n, instrs)) =
   "proc " ^ lbl ^ "(" ^ string_of_int n ^ ") =\n" ^

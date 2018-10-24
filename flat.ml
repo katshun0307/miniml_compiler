@@ -41,7 +41,10 @@ let string_of_flat prog =
   let pr_of_op = function
       S.Plus -> text "+"
     | S.Mult -> text "*"
-    | S.Lt -> text "<" in
+    | S.Lt -> text "<"
+    | S.And -> text "&&" 
+    | S.Or -> text "||" 
+  in
   let pr_of_value = function
       Var id -> text id
     | Fun id -> text "#'" <*> text id

@@ -41,6 +41,8 @@ let string_of_binop = function
     S.Plus -> "add"
   | S.Mult -> "mul"
   | S.Lt   -> "lt"
+  | S.And -> "&&" 
+  | S.Or -> "||" 
 
 let string_of_operand = function
     Param i -> "p" ^ string_of_int i

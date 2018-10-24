@@ -3,12 +3,14 @@ let err s = raise (Error s)
 
 type id = string
 
-type binOp = Plus | Mult | Lt
+type binOp = Plus | Mult | Lt | And | Or
 
 let string_of_op = function
     Plus -> "+"
   | Mult -> "*"
   | Lt   -> "<"
+  | And -> "&&"
+  | Or -> "||"
 
 type exp =
     Var       of id

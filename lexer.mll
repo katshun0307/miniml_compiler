@@ -31,6 +31,8 @@ rule main = parse
 | "*" { Parser.MULT }
 | "<" { Parser.LT }
 | "=" { Parser.EQ }
+| "&&" { Parser.AND }
+| "||" { Parser.OR }
 | "->" { Parser.RARROW }
 | "," { Parser.COMMA }
 | "." { Parser.DOT }
