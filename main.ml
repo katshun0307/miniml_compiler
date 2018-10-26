@@ -37,23 +37,12 @@ let rec compile prompt ichan cont =
   if !display_cfg && not !optimize then
     Cfg.display_cfg (Cfg.build vmcode) None;
 
-  let armcode =
-    if !optimize then
-      (* Low-level opt. (7章 DFA & 最適化) *)
-
-      let regcode = Opt.optimize !display_cfg Arm_spec.nreg vmcode in
-      dprint (fun () ->
-          "(* [Reg code] *)\n" ^ (Reg.string_of_reg regcode) ^ "\n");
-      (* Convert to ARM assembly (7章 コード生成(レジスタ利用版)) *)
-      Arm_reg.codegen regcode
-    else
-      (* Convert to ARM assembly (6章 コード生成) *)
-      Arm_noreg.codegen vmcode
-  in
+  let c_code = Backend.convert_c vmcode in
+  let c_string = C_spec.header_string ^ C_spec.string_of_funct_list c_code ^ "\n" in
 
   (** Output to stdout/file *)
   let ochan = if !outfile = "-" then stdout else open_out !outfile in
-  let () = output_string ochan ("(* [arm code] *)\n" ^ Arm_spec.string_of armcode ^ "\n") in
+  let () = output_string ochan (c_string ^ "\n") in
   if !outfile <> "-" then close_out ochan;
 
   (* continued... *)

@@ -14,6 +14,7 @@ OBJS=misc.cmo mySet.cmo myMap.cmo pretty.cmo \
 	syntax.cmo parser.cmo lexer.cmo \
 	environment.cmo normal.cmo closure.cmo \
 	flat.cmo vm.cmo arm_spec.cmo arm_noreg.cmo \
+	c_spec.cmo backend.cmo \
 	cfg.cmo dfa.cmo live.cmo reg.cmo \
 	arm_simulator.cmo \
 	opt.cmo arm_reg.cmo main.cmo
