@@ -29,6 +29,7 @@ let optimize is_disp_cfg nreg vmcode =
   let cfgs = Cfg.build vmcode in
   (* 生存変数解析器を生成 *)
   let lv = Live.make () in
+  (* let lv = Reachability.make () in *)
   (* 生存変数解析を実行 *)
   let lv_results = analyze_cfg lv cfgs in
   (* 解析結果を表示 *)
