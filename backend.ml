@@ -7,72 +7,63 @@ let fresh_var = Misc.fresh_id_maker "var"
 let param0_name: id = "param_0"
 let param1_name: id = "param_1"
 
-let var_assoc = ref (MyMap.empty: (V.id, id) MyMap.t)
-let closure_var = ref (MySet.empty: id MySet.t)
-let tuple_var = ref (MySet.empty: id MySet.t)
-let defined_var = ref (MySet.empty: id MySet.t)
-
-let id_is_closure (id: id) = MySet.member id !closure_var
-let id_is_tuple (id: id) = MySet.member id !tuple_var
-let id_is_defined (id:  id) = MySet.member id !defined_var
-
-let op_is_closure = function
-  | Var id -> id_is_closure id
-  | Imm _ -> false 
-
-let op_is_tuple = function
-  | Var id -> id_is_tuple id
-  | Imm _ -> false
-
-let op_is_defined = function
-  | Var id -> id_is_defined id
-  | Imm _ -> false
-
-let append_closure id = closure_var := MySet.insert id !closure_var
-let append_tuple id = tuple_var := MySet.insert id !tuple_var
-let append_defined id = defined_var := MySet.insert id !defined_var
-
 let is_vm_proc = function
   | V.Proc _ -> true
-  | _ -> false
+  | _ -> false 
 
 let label_of_proc proc = 
   match proc with
   | V.Proc l -> (l:label)
   | _ -> err "not implemented"
 
-let convert_id id = 
-  match MyMap.search id !var_assoc with
-  | Some id' -> id'
-  | None -> let id' = fresh_var (string_of_int id) in
-    var_assoc := MyMap.append id id' !var_assoc;
-    id'
-
-let id_of_op op = 
-  match op with 
-  | V.Local id -> convert_id id
-  | _ -> err "id_of_exp: unexpected input"
-
-let convert_op op = 
-  match op with
-  | V.Param i -> if i = 0 then Var param0_name
-    else Var param1_name
-  | V.Local id -> Var (convert_id id)
-  | V.IntV i -> Imm i
-  | V.Proc l -> Var ("unexpected_" ^ l)
-
 let c_of_decl (Vm.ProcDecl(lbl, local_var, instr_list)): funct =
+  (* helper definitions and functions *)
+  let var_assoc = ref (MyMap.empty: (V.id, id) MyMap.t) in
+  let closure_var = ref (MySet.empty: id MySet.t) in
+  let tuple_var = ref (MySet.empty: id MySet.t) in
+  let defined_var = ref (MySet.empty: id MySet.t) in
+  let id_is_closure (id: id) = MySet.member id !closure_var in
+  let id_is_tuple (id: id) = MySet.member id !tuple_var in
+  let id_is_defined (id:  id) = MySet.member id !defined_var in
+  let op_is_closure = function
+    | Var id -> id_is_closure id
+    | Imm _ -> false in
+  let op_is_tuple = function
+    | Var id -> id_is_tuple id
+    | Imm _ -> false in
+  let append_closure id = closure_var := MySet.insert id !closure_var in
+  let append_tuple id = tuple_var := MySet.insert id !tuple_var in
+  let append_defined id = defined_var := MySet.insert id !defined_var in
+  let convert_id id = 
+    match MyMap.search id !var_assoc with
+    | Some id' -> id'
+    | None -> let id' = fresh_var (string_of_int id) in
+      var_assoc := MyMap.append id id' !var_assoc;
+      id' in
+  let id_of_op op = 
+    match op with 
+    | V.Local id -> convert_id id
+    | _ -> err "id_of_exp: unexpected input" in
+  let convert_op op = 
+    match op with
+    | V.Param i -> if i = 0 then Var param0_name
+      else Var param1_name
+    | V.Local id -> Var (convert_id id)
+    | V.IntV i -> Imm i
+    | V.Proc l -> Var ("unexpected_" ^ l) in
+  (* end helper definition and functions *)
   let rec c_of_instr instr = 
     match instr with 
     | V.Move(id, op) -> 
       let id' = convert_id id in
       let op' = convert_op op in
+      let id_was_defined = id_is_defined id' in
       let is_closure = op_is_closure op' in
       let is_tuple = op_is_tuple op' in
       if is_closure then append_closure id';
       if is_tuple then append_tuple id';
       append_defined id';
-      let ty = if id_is_defined id' then Defined 
+      let ty = if id_was_defined then Defined 
         else (if is_closure then Closure else if is_tuple then Tuple else Int) in
       [Decl(ty, convert_id id, convert_op op)]
     | V.BinOp(id, binop, op1, op2) -> [Bin(convert_id id, binop, Exp(convert_op op1), Exp(convert_op op2))]
@@ -105,7 +96,7 @@ let c_of_decl (Vm.ProcDecl(lbl, local_var, instr_list)): funct =
            List.mapi (fun i op -> SetTupleValue(id', i, convert_op op)) opl
        | _ -> err "undefined")
     | V.Read(id, op, i) -> 
-      if id_is_closure (convert_id id) then 
+      if op_is_closure (convert_op op) then 
         (if i = 0 
          then [DeclarePointer(convert_id id); AssignPointer(convert_id id, id_of_op op)]
          else [Read(convert_id id, convert_op op, i)])

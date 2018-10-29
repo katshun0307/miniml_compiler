@@ -3,6 +3,7 @@ let dprint s = if !debug then (print_string (s ()) ; flush stdout)
 
 let display_cfg = ref false
 let optimize = ref false
+let run = ref false
 
 let outfile = ref "-"
 
@@ -45,8 +46,21 @@ let rec compile prompt ichan cont =
   let () = output_string ochan (c_string ^ "\n") in
   if !outfile <> "-" then close_out ochan;
 
-  (* continued... *)
-  cont ()
+  (* run created c program *)
+  if !run then
+    let tmpchan = open_out "tmp.c" in
+    let () = output_string tmpchan (c_string ^ "\n") in
+    close_out tmpchan;
+    print_string "compile c program in tmp.c...";
+    let comp_int = Sys.command "gcc tmp.c" in
+    if comp_int = 0 then print_string " => success\n"
+    else print_string " => failure";
+    print_string "executing program...\n";
+    let ret = Sys.command "./a.out" in
+    print_string ("returned " ^ string_of_int ret ^ "\n");
+
+    (* continued... *)
+    cont ()
 
 
 (* ==== main ==== *)
@@ -64,6 +78,8 @@ let aspec = Arg.align [
      " Display CFG (default: " ^ (string_of_bool !display_cfg) ^ ")");
     ("-v", Arg.Unit (fun () -> debug := true),
      " Print debug info (default: " ^ (string_of_bool !debug) ^ ")");
+    ("-R", Arg.Unit (fun () -> run := true),
+     " Print debug info (default: " ^ (string_of_bool !run) ^ ")");
   ]
 
 let main () =
