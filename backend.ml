@@ -74,7 +74,9 @@ let c_of_decl (Vm.ProcDecl(lbl, local_var, instr_list)): funct =
       (match opl with
        | closure:: x:: [] -> [Call(convert_id dest, id_of_op op, id_of_op closure, convert_op x)]
        | _ -> err "unexpected function call")
-    | V.Return op -> [Return(convert_op op)]
+    | V.Return op -> if lbl = "_toplevel" 
+      then [Print(convert_op op); Exit]
+      else [Return(convert_op op)]
     | V.Malloc(id, opl) ->
       (match opl with
        | pointer:: vars ->

@@ -24,6 +24,7 @@ type exp =
   | If of op * exp 
   | Write of id * int * op (* id[i] = op *)
   | Return of op (* return op *)
+  | Print of op
   | Read of id * op * int (* id = op[int] *)
   | Label of label
   | Goto of label
@@ -40,7 +41,7 @@ type exp =
   (* | GetParams of id *)
   | DeclarePointer of id
   | AssignPointer of id * id (* id = id.f *)
-  | Dummy of id
+  | Exit
 
 type funct = Funct of id * (id list) * (exp list)
 
@@ -72,6 +73,7 @@ let rec string_of_exp exp =
     | If(op, e) -> ["if(" ^ string_of_op op ^ "){\n" ^ string_of_exp e ^ "}"]
     | Write(id, i, op) -> [id ^ "[" ^ string_of_int i ^ "]"; "="; string_of_op op]
     | Return op -> ["return"; string_of_op op]
+    | Print op -> ["printf(\"%d\\n\", " ^ string_of_op op ^ ")"]
     | Read(sid, rop, i) -> ["int"; string_of_id sid; "="; string_of_op rop ^ "[" ^  string_of_int i ^ "]"]
     | Label(l) -> [l ^ ":"]
     | Goto(l) -> ["goto"; l]
@@ -86,7 +88,7 @@ let rec string_of_exp exp =
     | SetClosureParams id -> [id ^ ".vars"; "="; "params"]
     | DeclarePointer(id) -> ["int (*" ^ id ^ ")(const int*, const int)"]
     | AssignPointer(id1, id2) -> [id1; "="; id2 ^ ".f"]
-    | Dummy id -> ["dummy of"; id]
+    | Exit -> ["return 0"]
     (* | SetClosureVars(id, opl) *)
     (* | _ -> err "not implemented" *)
     (* | Call(op, id1, op2) -> [string_of_op op ^ "(" ^ string_of_id id1 ^ "," ; string_of_op op2 ^ ")"] *)
