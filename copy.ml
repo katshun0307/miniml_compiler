@@ -2,11 +2,11 @@ open Vm
 open Cfg
 open Dfa
 module Set = MySet
+module Map = MyMap
 
-type assignment = id * operand
+type assignment = id * id
 
-
-let dummy: assignment = (-1, Local(-1))
+let dummy: assignment = (-1, -1)
 
 (* compare *)
 let compare left right =
@@ -15,8 +15,8 @@ let compare left right =
   else
     (if Set.is_empty (Set.diff right left) then GT else NO)
 
-let string_of_assignment ((id, op): assignment): string = 
-  "(" ^ string_of_int id ^ " <- " ^ string_of_operand op ^ ")"
+let string_of_assignment ((id1, id2): assignment): string = 
+  "(t" ^ string_of_int id1 ^ "<..t" ^ string_of_int id2 ^ ")"
 
 let string_of_assignments vs =
   String.concat ", "
@@ -27,34 +27,26 @@ let string_of_assignments vs =
 (* TODO *)
 let lub = Set.union 
 
-(* TODO *)
-let filter_vars vs =
-  Set.from_list (List.filter (fun v ->
-      match v with
-        Param _ | Local _ -> true
-      | Proc _ | IntV _ -> false
-    ) (Set.to_list vs))
-
-(* 
-– gen(d:x=y)={x=y}
-– gen(d:x=e)={}(e is not a variable)
-– kill(d:x=e)={z=w|x is not x nor w} 
-– fd(X) = gen(d) ∪ (X - kill(d)) 
-*)
 let transfer (entry_vars: assignment Set.t) (stmt: Vm.instr): assignment Set.t = 
   let gen asm = 
+    (* return new assignment *)
     match asm with
     | Move(dst, src) -> 
       (match src with
-       | Local _ -> Set.singleton (dst, src)
+       | Local src' -> Set.singleton (dst, src')
        | _ -> Set.empty)
     | _ -> Set.empty in
   let kill asm = 
+    (* return assignments to be killed *)
+    let generate_kill_filter dst' ((d, s): assignment) = 
+      dst' = d || dst' = s in
     match asm with
-    | Move (dst, src) -> Set.empty (* todo *)
-    | _ -> Set.empty in
-  (* TODO *)
-  Set.empty
+    | Move (dst, src) -> 
+      let kill_filter = generate_kill_filter dst in
+      Set.filter kill_filter entry_vars
+    | _ -> Set.empty
+  in
+  Set.union (gen stmt) (Set.remove_mult (kill stmt) entry_vars)
 
 (* make reachability analyzer *)
 let make (): assignment Set.t Dfa.analysis = 
