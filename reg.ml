@@ -118,6 +118,7 @@ let trans_decl nreg lives (Vm.ProcDecl (lbl, nlocal, instrs)) =
   (* store generated instrs *)
   let instrs_list = ref ([]: instr list) in
   let append_instr d = instrs_list := (!instrs_list @ d) in
+  let old_ops = ref (MySet.empty: V.operand MySet.t) in
   (* manage offset *)
   let offset_counter = ref 0 in
   let get_new_offset () = 
@@ -127,7 +128,7 @@ let trans_decl nreg lives (Vm.ProcDecl (lbl, nlocal, instrs)) =
   (* manage allocation of Vm.id to dest *)
   let dest_alloc = ref (MyMap.empty: (V.id, dest) MyMap.t) in
   let append_alloc (id, d) = dest_alloc := MyMap.append id d !dest_alloc in
-  (* let free_alloc id = dest_alloc := MyMap.remove id !dest_alloc in *)
+  let free_alloc id = dest_alloc := MyMap.remove id !dest_alloc in
   let alloc_status () = 
     let rec loop l raccum laccum =
       (match l with
@@ -161,6 +162,25 @@ let trans_decl nreg lives (Vm.ProcDecl (lbl, nlocal, instrs)) =
         (append_alloc (id, R ret);
          R ret)
   in
+  (* swap allocation for given offset and dest *)
+  let swap (off: offset) (r: reg) =
+    (* === swap alloc data === *)
+    let id_off' = MyMap.reverse_search (L off) !dest_alloc in
+    let id_reg' = MyMap.reverse_search (R r) !dest_alloc in
+    let (id_off, id_reg) = 
+      match (id_off', id_reg') with
+      | Some o, Some r -> (o, r)
+      | _ -> err "failed to swap" in
+    dest_alloc := MyMap.assoc id_off (R r) !dest_alloc;
+    dest_alloc := MyMap.assoc id_reg (L off) !dest_alloc;
+    (* === change data === *)
+    (* move offset to reserved_reg *)
+    append_instr [Load(reserved_reg, off)];
+    (* move reg to offset *)
+    append_instr [Store(r, off)];
+    (* move reserved_reg to reg *)
+    append_instr [Move(r, Reg reserved_reg)];
+  in
   let convert_op op = 
     match op with
     | V.Param i -> Param i
@@ -169,11 +189,14 @@ let trans_decl nreg lives (Vm.ProcDecl (lbl, nlocal, instrs)) =
       (match dest with
        | R i -> Reg i
        | L o -> 
-         append_instr [Load(reserved_reg, o)];
-         Reg reserved_reg)
+         (* swap offset with some register *)
+         let swap_r = List.hd (get_used_reg ()) in
+         swap o swap_r;
+         Reg swap_r)
     | V.Proc l -> Proc l
     | V.IntV i -> IntV i
   in
+  (* move data in s to register d *)
   let move_to_reg (d: reg) (s: V.operand): instr list =
     match s with
     | V.Param i -> [Move(d, convert_op s)]
@@ -185,6 +208,7 @@ let trans_decl nreg lives (Vm.ProcDecl (lbl, nlocal, instrs)) =
     | V.Proc l -> [Move(d, Proc l)]
     | V.IntV i -> [Move(d, IntV i)]
   in
+  (* move data in register to dest (either reg or offset) *)
   let move_to_dest (d:dest) (s:reg) = 
     match d with
     | R r -> [Move(r, Reg s)]
@@ -198,9 +222,9 @@ let trans_decl nreg lives (Vm.ProcDecl (lbl, nlocal, instrs)) =
     let before = get_property instr Cfg.BEFORE in
     let after = get_property instr Cfg.AFTER in
     (* transfer same allocations *)
-    let same_ops = MySet.to_list(MySet.intersection before after) in
-    let same_alloc = List.filter (fun (id, _) -> List.exists (fun y -> y = V.Local id) same_ops) (MyMap.to_list !dest_alloc) in
-    dest_alloc := MyMap.from_list same_alloc;
+    (* let same_ops = MySet.to_list(MySet.intersection before after) in
+       let same_alloc = List.filter (fun (id, _) -> List.exists (fun y -> y = V.Local id) same_ops) (MyMap.to_list !dest_alloc) in
+       dest_alloc := MyMap.from_list same_alloc; *)
     (* add new allocations *)
     let new_ops = MySet.diff after before in
     let get_dest op = 
@@ -211,6 +235,16 @@ let trans_decl nreg lives (Vm.ProcDecl (lbl, nlocal, instrs)) =
       | _ -> ()
     in
     List.iter get_dest (MySet.to_list new_ops);
+    (* save old ops for next *)
+    let old_op = MySet.diff before after in
+    old_ops := old_op;
+    (* remove old ops in previous instr *)
+    let remove_allocs op = 
+      match op with
+      | V.Local id -> free_alloc id;
+      | _ -> ()
+    in
+    List.iter remove_allocs (MySet.to_list !old_ops); 
   in
   let reg_of_instr instr =
     decide_allocation instr;
