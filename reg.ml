@@ -115,14 +115,16 @@ let offset_of_dest = function
   | L o -> o
 
 let trans_decl nreg lives (Vm.ProcDecl (lbl, nlocal, instrs)) =
+  (* store generated instrs *)
   let instrs_list = ref ([]: instr list) in
   let append_instr d = instrs_list := (!instrs_list @ d) in
+  (* manage offset *)
   let offset_counter = ref 0 in
   let get_new_offset () = 
     let r = !offset_counter in
     offset_counter := !offset_counter + 1;
     r in
-  (* allocation of dest >>> *)
+  (* manage allocation of Vm.id to dest *)
   let dest_alloc = ref (MyMap.empty: (V.id, dest) MyMap.t) in
   let append_alloc (id, d) = dest_alloc := MyMap.append id d !dest_alloc in
   (* let free_alloc id = dest_alloc := MyMap.remove id !dest_alloc in *)
@@ -171,7 +173,7 @@ let trans_decl nreg lives (Vm.ProcDecl (lbl, nlocal, instrs)) =
          Reg reserved_reg)
     | V.Proc l -> Proc l
     | V.IntV i -> IntV i
-  in 
+  in
   let move_to_reg (d: reg) (s: V.operand): instr list =
     match s with
     | V.Param i -> [Move(d, convert_op s)]
@@ -188,8 +190,31 @@ let trans_decl nreg lives (Vm.ProcDecl (lbl, nlocal, instrs)) =
     | R r -> [Move(r, Reg s)]
     | L o -> [Store(s, o)]
   in
-  (* >>> allocation of dest *)
-  let reg_of_instr = function
+  (* decide register allocation based on live analysis *)
+  let live_bblock = Cfg.vm_to_cfg lbl instrs in
+  let live_result = Dfa.solve (Live.make ()) live_bblock in
+  let get_property = Dfa.get_property live_result in
+  let decide_allocation instr =
+    let before = get_property instr Cfg.BEFORE in
+    let after = get_property instr Cfg.AFTER in
+    (* transfer same allocations *)
+    let same_ops = MySet.to_list(MySet.intersection before after) in
+    let same_alloc = List.filter (fun (id, _) -> List.exists (fun y -> y = V.Local id) same_ops) (MyMap.to_list !dest_alloc) in
+    dest_alloc := MyMap.from_list same_alloc;
+    (* add new allocations *)
+    let new_ops = MySet.diff after before in
+    let get_dest op = 
+      match op with
+      | V.Local id -> 
+        let id' = convert_id id in
+        append_alloc (id, id')
+      | _ -> ()
+    in
+    List.iter get_dest (MySet.to_list new_ops);
+  in
+  let reg_of_instr instr =
+    decide_allocation instr;
+    match instr with
     | V.Move(id, op) -> 
       let id' = convert_id id in
       if is_register id' 
