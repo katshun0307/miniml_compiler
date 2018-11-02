@@ -1,3 +1,5 @@
+module V = Vm
+
 exception Error of string
 let err s = raise (Error s)
 
@@ -60,36 +62,36 @@ let string_of_operand = function
 
 let string_of_instr idt tab = function
     Move (t, v) ->
-      idt ^ "move" ^ tab ^ "r" ^ string_of_int t ^ ", " ^
-      string_of_operand v
+    idt ^ "move" ^ tab ^ "r" ^ string_of_int t ^ ", " ^
+    string_of_operand v
   | Load (r, oft) ->
-      idt ^ "load" ^ tab ^ "r" ^ string_of_int r ^ ", t" ^
-      string_of_int oft
+    idt ^ "load" ^ tab ^ "r" ^ string_of_int r ^ ", t" ^
+    string_of_int oft
   | Store (r, oft) ->
-      idt ^ "store" ^ tab ^ "r" ^ string_of_int r ^ ", t" ^
-      string_of_int oft
+    idt ^ "store" ^ tab ^ "r" ^ string_of_int r ^ ", t" ^
+    string_of_int oft
   | BinOp (t, op, v1, v2) ->
-      idt ^ string_of_binop op ^ tab ^ "r" ^ string_of_int t ^ ", " ^
-      string_of_operand v1 ^ ", " ^ string_of_operand v2
+    idt ^ string_of_binop op ^ tab ^ "r" ^ string_of_int t ^ ", " ^
+    string_of_operand v1 ^ ", " ^ string_of_operand v2
   | Label lbl -> lbl ^ ":"
   | BranchIf (v, lbl) ->
-      idt ^ "bif" ^ tab ^ string_of_operand v ^ ", " ^ lbl
+    idt ^ "bif" ^ tab ^ string_of_operand v ^ ", " ^ lbl
   | Goto lbl ->
-      idt ^ "goto" ^ tab ^ lbl
+    idt ^ "goto" ^ tab ^ lbl
   | Call (dst, tgt, [a0; a1]) ->
-      idt ^ "call" ^ tab ^ string_of_dest dst ^ ", " ^
-      string_of_operand tgt ^
-      "(" ^ string_of_operand a0 ^ ", " ^ string_of_operand a1 ^ ")"
+    idt ^ "call" ^ tab ^ string_of_dest dst ^ ", " ^
+    string_of_operand tgt ^
+    "(" ^ string_of_operand a0 ^ ", " ^ string_of_operand a1 ^ ")"
   | Call (_, _, args) -> err ("Illegal number of arguments: " ^
                               string_of_int (List.length args))
   | Return v ->
-      idt ^ "ret" ^ tab ^ string_of_operand v
+    idt ^ "ret" ^ tab ^ string_of_operand v
   | Malloc (t, vs) ->
-      idt ^ "new" ^ tab ^ string_of_dest t ^ " [" ^
-      (String.concat ", " (List.map string_of_operand vs)) ^ "]"
+    idt ^ "new" ^ tab ^ string_of_dest t ^ " [" ^
+    (String.concat ", " (List.map string_of_operand vs)) ^ "]"
   | Read (t, v, i) ->
-      idt ^ "read" ^ tab ^ string_of_dest t ^ " #" ^
-      string_of_int i ^ "(" ^ string_of_operand v ^ ")"
+    idt ^ "read" ^ tab ^ string_of_dest t ^ " #" ^
+    string_of_int i ^ "(" ^ string_of_operand v ^ ")"
 
 let string_of_decl (ProcDecl (lbl, n, instrs)) =
   "proc " ^ lbl ^ "(" ^ string_of_int n ^ ") =\n" ^
@@ -100,10 +102,115 @@ let string_of_reg prog =
   String.concat "\n" (List.map string_of_decl prog)
 
 (* ==== レジスタ割付け ==== *)
+let is_register = function
+  | R _ -> true
+  | L _ -> false
+
+let reg_of_dest = function
+  | R r -> r
+  | L _ -> err "is not reg: reg_of_dest"
+
+let offset_of_dest = function
+  | R _ -> err "is not offset"
+  | L o -> o
 
 let trans_decl nreg lives (Vm.ProcDecl (lbl, nlocal, instrs)) =
-  let insts' = [Return (IntV 1)] in
-  ProcDecl (lbl, 0, insts')
+  let instrs_list = ref ([]: instr list) in
+  let append_instr d = instrs_list := (!instrs_list @ d) in
+  let offset_counter = ref 0 in
+  let get_new_offset () = 
+    let r = !offset_counter in
+    offset_counter := !offset_counter + 1;
+    r in
+  (* allocation of dest >>> *)
+  let dest_alloc = ref (MyMap.empty: (V.id, dest) MyMap.t) in
+  let append_alloc (id, d) = dest_alloc := MyMap.append id d !dest_alloc in
+  (* let free_alloc id = dest_alloc := MyMap.remove id !dest_alloc in *)
+  let alloc_status () = 
+    let rec loop l raccum laccum =
+      (match l with
+       | (_, R i):: tl -> loop tl (i :: raccum) laccum
+       | (_, L i):: tl -> loop tl raccum (i:: laccum)
+       | [] -> (raccum, laccum)) in
+    loop (MyMap.to_list !dest_alloc) [] [] 
+  in
+  let get_used_reg () = 
+    let (r_usage, _) = alloc_status () in
+    r_usage
+  in
+  let get_nlocal () = 
+    let (_, l_usage) = alloc_status () in
+    List.length l_usage 
+  in
+  let get_free_reg () = 
+    let used = get_used_reg () in
+    List.filter (fun x -> not (List.exists (fun y -> y = x) used)) (List.init nreg (fun x -> x)) 
+  in
+  let convert_id id = 
+    match MyMap.search id !dest_alloc with
+    | Some d -> d
+    | None -> 
+      let free_reg = get_free_reg () in
+      if List.length free_reg = 0 
+      then let ret = get_new_offset () in
+        (append_alloc (id, L ret);
+         L ret)
+      else let ret =  List.hd free_reg in
+        (append_alloc (id, R ret);
+         R ret)
+  in
+  let convert_op op = 
+    match op with
+    | V.Param i -> Param i
+    | V.Local id -> 
+      let dest = (convert_id id) in
+      (match dest with
+       | R i -> Reg i
+       | L o -> 
+         append_instr [Load(reserved_reg, o)];
+         Reg reserved_reg)
+    | V.Proc l -> Proc l
+    | V.IntV i -> IntV i
+  in 
+  let move_to_reg (d: reg) (s: V.operand): instr list =
+    match s with
+    | V.Param i -> [Move(d, convert_op s)]
+    | V.Local id -> 
+      let dest = convert_id id in
+      if is_register dest 
+      then [Move(d, Reg (reg_of_dest dest))]
+      else [Load(d, offset_of_dest dest)]
+    | V.Proc l -> [Move(d, Proc l)]
+    | V.IntV i -> [Move(d, IntV i)]
+  in
+  let move_to_dest (d:dest) (s:reg) = 
+    match d with
+    | R r -> [Move(r, Reg s)]
+    | L o -> [Store(s, o)]
+  in
+  (* >>> allocation of dest *)
+  let reg_of_instr = function
+    | V.Move(id, op) -> 
+      let id' = convert_id id in
+      if is_register id' 
+      then append_instr (move_to_reg (reg_of_dest id') op)
+      else append_instr ((move_to_reg reserved_reg op) @ (move_to_dest id' reserved_reg))
+    | V.BinOp(id, bop, op1, op2) ->
+      let id' = convert_id id in
+      if is_register id' 
+      then append_instr [BinOp(reg_of_dest id', bop, convert_op op1, convert_op op2)]
+      else append_instr [BinOp(reserved_reg, bop, convert_op op1, convert_op op2)]
+    | V.Label l -> append_instr [Label l]
+    | V.BranchIf(op, l) -> append_instr [BranchIf(convert_op op, l)]
+    | V.Goto l -> append_instr [Goto l]
+    | V.Call(id, op, opl) -> append_instr [Call(convert_id id, convert_op op, List.map convert_op opl)]
+    | V.Return op -> append_instr [Return (convert_op op)]
+    | Malloc(id, opl) -> append_instr [Malloc(convert_id id, List.map convert_op opl)]
+    | Read(id, op, i) -> append_instr [Read(convert_id id, convert_op op, i)]
+    | _ -> append_instr [] (* begin, end *)
+  in
+  List.iter reg_of_instr instrs;
+  ProcDecl(lbl, get_nlocal (), !instrs_list)
 
 (* entry point *)
 let trans nreg lives = List.map (trans_decl nreg lives)
