@@ -16,3 +16,5 @@ val map : ('a -> 'b) -> 'a t -> 'b t
 val bigunion : 'a t t -> 'a t
 (* added *)
 val filter : ('a -> bool) -> 'a t -> 'a t
+val exists : 'a -> 'a t -> bool
+val intersection : 'a t -> 'a t -> 'a t
