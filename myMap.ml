@@ -53,3 +53,8 @@ let bigmerge ms =
       [] -> []
     | map1 :: rest -> merge map1 (bm rest) in
   bm (MySet.to_list ms)
+
+let rec reverse_search v = function
+  | (k', v'):: tl -> if v = v' then Some k' 
+    else reverse_search v tl
+  | [] -> None

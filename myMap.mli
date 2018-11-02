@@ -14,3 +14,5 @@ val remove : 'a -> ('a, 'b) t -> ('a, 'b) t
 val contains : 'a -> ('a, 'b) t -> bool
 val map : ('a -> 'b -> 'a * 'b) -> ('a, 'b) t -> ('a, 'b) t
 val bigmerge : ('a, 'b) t MySet.t -> ('a, 'b) t
+(* added *)
+val reverse_search : 'b -> ('a, 'b) t -> 'a option
