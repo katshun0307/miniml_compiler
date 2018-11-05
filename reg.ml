@@ -3,6 +3,14 @@ module V = Vm
 exception Error of string
 let err s = raise (Error s)
 
+let select_random l =
+  let len = List.length l in
+  if len = 0 
+  then err "select_random: got list with 0 length"
+  else 
+    let r  = Random.int len in
+    List.nth l r
+
 type binOp = Vm.binOp
 
 type offset = int
@@ -190,7 +198,7 @@ let trans_decl nreg lives (Vm.ProcDecl (lbl, nlocal, instrs)) =
        | R i -> Reg i
        | L o -> 
          (* swap offset with some register *)
-         let swap_r = List.hd (get_used_reg ()) in
+         let swap_r = select_random (get_used_reg ()) in
          swap o swap_r;
          Reg swap_r)
     | V.Proc l -> Proc l
@@ -264,8 +272,8 @@ let trans_decl nreg lives (Vm.ProcDecl (lbl, nlocal, instrs)) =
     | V.Goto l -> append_instr [Goto l]
     | V.Call(id, op, opl) -> append_instr [Call(convert_id id, convert_op op, List.map convert_op opl)]
     | V.Return op -> append_instr [Return (convert_op op)]
-    | Malloc(id, opl) -> append_instr [Malloc(convert_id id, List.map convert_op opl)]
-    | Read(id, op, i) -> append_instr [Read(convert_id id, convert_op op, i)]
+    | V.Malloc(id, opl) -> append_instr [Malloc(convert_id id, List.map convert_op opl)]
+    | V.Read(id, op, i) -> append_instr [Read(convert_id id, convert_op op, i)]
     | _ -> append_instr [] (* begin, end *)
   in
   List.iter reg_of_instr instrs;
