@@ -43,7 +43,7 @@ let rec compile prompt ichan cont =
 
       let regcode = Opt.optimize !display_cfg Arm_spec.nreg vmcode in
       dprint (fun () ->
-          "(* [Reg code] *)\n" ^ (Reg.string_of_reg regcode) ^ "\n");
+          "\n(* [Reg code] *)\n" ^ (Reg.string_of_reg regcode) ^ "\n");
       (* Convert to ARM assembly (7章 コード生成(レジスタ利用版)) *)
       Arm_reg.codegen regcode
     else
