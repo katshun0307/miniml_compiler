@@ -7,7 +7,17 @@
 *.automaton
 *.depend
 *.o
+*.s
 *~
+_build*
+*.dot
+*.dvi
+*.toc
+*.aux
+*.pdf
+*.tex
+!report*.tex
+!report*.pdf
 parser.ml
 parser.mli
 lexer.ml
