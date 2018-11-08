@@ -7,6 +7,8 @@
 \date{\today}
 \maketitle
 
+\begin{comment}
+
 \section*{課題1 (拡張構文: 任意)}
 
 \subsection*{階乗計算}
@@ -494,6 +496,8 @@ LetRec式\lstinline{let rec f x = e1 in e2}の正規形では,
 
 また,e1, e2ともに正規形のものが, LetRec式の内部に存在する必要があるので, 他の実装とは異なり,norm\_expの呼び出しがLetRec式内部に来るようになっている.
 
+\end{comment}
+
 \section*{課題6 (クロージャ変換: 必須)}
 
 \begin{quotation}
@@ -563,7 +567,7 @@ let convert e = closure_exp e (fun ce -> CompExp ce) Environment.empty
 get\_out\_of\_scope\_variables関数を定義した.
 この関数は,探索対象のN.expをeとして受け取り, 
 すでにスコープに入っている変数名をincludedで受け取り,
-スコープ外の変数をlistで返す.
+スコープ外の変数をlistで返す. includedには自分の関数名,自分の引数を渡す.
 
 \begin{lstlisting}[caption=スコープ外変数の発見]
   let get_out_of_scope_variables (e: N.exp) (included: N.id list): value list = 
@@ -634,7 +638,7 @@ LetRec式においては, 関数のidだけだったものが,関数クロージ
 \begin{lstlisting}[caption=LetRec式の実装]
 | N.LetRecExp(funct, id, e1, e2) -> 
     let recpointer = fresh_id ("b_" ^ funct) in
-    let out_of_scope_vars = get_out_of_scope_variables e1 [id] in
+    let out_of_scope_vars = get_out_of_scope_variables e1 [funct; id] in
     let funct_tuple_list = (Var recpointer:: out_of_scope_vars) in
     let rec make_tuple_env l i env =  (* make environment from id to projection to var in closure *)
       match l with 
@@ -762,6 +766,8 @@ let flatten exp =
   let toplevel_content, decl_list = get_flat_exp exp in
   decl_list @ [RecDecl("_toplevel", [], toplevel_content)]
 \end{lstlisting}
+
+\begin{comment}
 
 \section*{課題8 (仮想機械コード生成: 必須)}
 
@@ -935,5 +941,7 @@ $var\_alloc$変換が存在すれば,その変換を返せば良い.
 即値が入ってるので,そのまま$IntV$型へ変換すれば良い.
 
 \end{description}
+
+\end{comment}
 
 \end{document}
