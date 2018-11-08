@@ -168,7 +168,7 @@ let rec closure_exp (e: N.exp) (f: cexp -> exp) (sigma: cexp Environment.t): exp
         LetExp(convert_id id, y1, closure_exp e2 f sigma)) sigma
   | N.LetRecExp(funct, id, e1, e2) -> 
     let recpointer = fresh_id ("b_" ^ funct) in
-    let out_of_scope_vars = get_out_of_scope_variables e1 [id] in
+    let out_of_scope_vars = get_out_of_scope_variables e1 [funct; id] in
     let funct_tuple_list = (Var recpointer:: out_of_scope_vars) in
     let rec make_tuple_env l i env =  (* make environment from id to projection to var in closure *)
       match l with 
