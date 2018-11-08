@@ -57,13 +57,14 @@ let rec compile prompt ichan cont =
   if !outfile <> "-" then close_out ochan;
 
   if !simulation
-  then let state = Arm_simulator.simulate armcode in
-    (print_string ("\n(* [Simulation result] *)\n" ^
-                   (Arm_simulator.string_of_state state) ^ "\n");
-     flush stdout);
+  then print_string "\n(* simulated statements *)\n";
+  let state = Arm_simulator.simulate armcode in
+  (print_string ("\n(* [Simulation result] *)\n" ^
+                 (Arm_simulator.string_of_state state) ^ "\n");
+   flush stdout);
 
-    (* continued... *)
-    cont ()
+  (* continued... *)
+  cont ()
 
 
 (* ==== main ==== *)

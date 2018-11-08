@@ -19,6 +19,8 @@ let reg_mappings = [
   (6, V7);
 ]
 
+let normal_regs = List.filter (fun r -> r <> Ip) (List.map (fun (_, r) -> r) reg_mappings)
+
 let reg_of r = List.assoc r reg_mappings
 
 (* 「reg中のアドレスからoffsetワード目」をあらわすaddr *)
@@ -57,9 +59,7 @@ let gen_dest (rs: reg) = function
 
 let convert_op op = 
   match op with
-  | Reg.Param i -> if i = 1 then R A1
-    else if i = 2 then R A2
-    else err "unexpected param number: convert_op"
+  | Reg.Param i -> R (param_to_reg i)
   | Reg.Reg r -> R (reg_of r)
   | Reg.Proc l -> L l
   | Reg.IntV i -> I i
@@ -92,17 +92,19 @@ let gen_decl (Reg.ProcDecl(name, nlocal, instrs)) =
     | Reg.Goto l -> append_stmt [Instr(B l)]
     | Reg.Call(dest, op, opl) -> 
       let f = List.hd opl in
-      let x = List.hd (List.tl opl) in
-      append_stmt( 
-        (* step1: save A1, A2 registers to memory, set new arguments to A1, A2 registers *)
-        [Instr(Str(A1, RI(Sp, 0))); Instr(Str(A2, RI(Sp, 4)));] @ (gen_operand A1 f) @ (gen_operand A2 x) @
-        (* set function pointer to register r *)
-        [Instr(Blx(reg_of_operand op))] @
-        (* Step12: store result *)
-        gen_dest A1 dest @
-        (* Step13: reset 2 arguments *)
-        [Instr(Ldr(A1, RI(Sp, 0))); Instr(Ldr(A2, RI(Sp, 4)));]
-      )
+      let x = List.hd (List.tl opl) in 
+      (* step1: save A1, A2 registers to memory, set new arguments to A1, A2 registers *)
+      append_stmt([Instr(Str(A1, RI(Sp, 0))); Instr(Str(A2, RI(Sp, 4)));] @ (gen_operand A1 f) @ (gen_operand A2 x));
+      (* save registers to local *)
+      append_stmt(List.mapi (fun i reg -> Instr(Str(reg, local_access(nlocal-i-1)))) normal_regs);
+      (* jump to label *)
+      append_stmt([Instr(Blx(reg_of_operand op))]);
+      (* return registers to regs *)
+      append_stmt(List.mapi (fun i reg -> Instr(Ldr(reg, local_access(nlocal-i-1)))) normal_regs);
+      (* Step12: store result *)
+      append_stmt(gen_dest A1 dest);
+      (* Step13: reset 2 arguments *)
+      append_stmt[Instr(Ldr(A1, RI(Sp, 0))); Instr(Ldr(A2, RI(Sp, 4)))]
     | Reg.Label l -> append_stmt [Label l]
     | Reg.BranchIf(op, l) -> 
       append_stmt ([Instr(Cmp(reg_of_operand op, I 0)); Instr(Bne(l))])
@@ -110,32 +112,34 @@ let gen_decl (Reg.ProcDecl(name, nlocal, instrs)) =
       append_stmt ((gen_operand A1 op) @ [Instr (B (name ^ "_ret"))])
     | Reg.Malloc(dest, opl) -> 
       let alloc_size = List.length opl in
-      append_stmt(
-        [ 
+      append_stmt([ 
           Instr(Str(A1, RI(Sp, 0)));
           Instr(Str(A2, RI(Sp, 4)));
         ] @
-        (gen_operand A1 (Reg.IntV alloc_size)) @
-        (* jump to function head *)
-        [Instr(Bl "mymalloc");] @
-        (* Step12: store result *)
-        gen_dest A1 dest);
-      (* Step 12.5: store operands to allocated space *)
-      let some_reg = A2 in
-      List.iteri (fun i  op -> append_stmt(gen_operand some_reg op @ [Instr(Str(some_reg, RI(A1, i)))])) opl;
-      (* Step13: reset 2 arguments *)
+          (gen_operand A1 (Reg.IntV alloc_size)));
+      (* jump to function head *)
+      append_stmt([Instr(Bl "mymalloc");]);
+      (* store contents in allocated space *)
+      let some_reg = reg_of Reg.reserved_reg in
+      List.iteri (fun i  op -> append_stmt(gen_operand some_reg op @ [Instr(Str(some_reg, RI(A1, 4 * i)))])) opl;
+      (* Step12: store result *)
+      append_stmt (gen_dest A1 dest);
+      (* Step13: reset 2 arguments  *)
       append_stmt([
           Instr(Ldr(A1, RI(Sp, 0)));
           Instr(Ldr(A2, RI(Sp, 4)));
-        ])
-      ;
-      (* store contents in local var *)
-      (* let store_stmts = List.concat(List.mapi (fun i op -> gen_operand r2 op @ [Instr(Str(r2, RI(r, 4 * i)))]) opl)
-         in append_stmt store_stmts *)
+        ]);
     | Reg.Read(dest, op, i) -> 
-      let r2 = V6 in (* r2 is where to store result *)
-      append_stmt ([Instr(Ldr(r2, mem_access (reg_of_operand op) i))])
-    | _ -> () (* BEGIN, END *) 
+      if Reg.is_register dest 
+      then append_stmt [Instr(Ldr(reg_of (Reg.reg_of_dest dest), mem_access (reg_of_operand op) i))]
+      else append_stmt ([
+          (* load to reserved reg *)
+          Instr(Ldr(reg_of Reg.reserved_reg, mem_access (reg_of_operand op) i))]
+          (* store to dest *)
+          @ gen_dest (reg_of Reg.reserved_reg) dest
+        )
+    | Reg.Load(r, offset) -> append_stmt [Instr(Ldr(reg_of r, local_access offset))]
+    | Reg.Store(r, offset) -> append_stmt [Instr(Str(reg_of r, local_access offset))]
   in
   (* convert main instrs (store to arm_stmts) *)
   List.iter stmt_instr instrs;

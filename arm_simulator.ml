@@ -151,7 +151,10 @@ let analyze_label =
   in List.fold_left f ([], 0, [])
 
 let run all_stmts initial_state =
-  let rec step state = function
+  let rec step state stmt_list =
+    if stmt_list <> [] 
+    then print_string (string_of_stmt(List.hd stmt_list) ^ "\n");
+    match stmt_list with 
     | [] -> state
     | (Instr instr) :: rest ->
       (match instr with

@@ -126,7 +126,8 @@ let trans_decl nreg lives (Vm.ProcDecl (lbl, nlocal, instrs)) =
   (* store generated instrs *)
   let instrs_list = ref ([]: instr list) in
   let append_instr d = instrs_list := (!instrs_list @ d) in
-  let old_ops = ref (MySet.empty: V.operand MySet.t) in
+  (* let old_ops = ref (MySet.empty: V.operand MySet.t) in *)
+  let previous_live = ref (MySet.empty: V.operand MySet.t) in
   (* manage offset *)
   let offset_counter = ref 0 in
   let get_new_offset () = 
@@ -227,32 +228,28 @@ let trans_decl nreg lives (Vm.ProcDecl (lbl, nlocal, instrs)) =
   let live_result = Dfa.solve (Live.make ()) live_bblock in
   let get_property = Dfa.get_property live_result in
   let decide_allocation instr =
-    let before = get_property instr Cfg.BEFORE in
-    let after = get_property instr Cfg.AFTER in
-    (* transfer same allocations *)
-    (* let same_ops = MySet.to_list(MySet.intersection before after) in
-       let same_alloc = List.filter (fun (id, _) -> List.exists (fun y -> y = V.Local id) same_ops) (MyMap.to_list !dest_alloc) in
-       dest_alloc := MyMap.from_list same_alloc; *)
-    (* add new allocations *)
+    let before = !previous_live in
+    let after = get_property instr Cfg.BEFORE in
+    previous_live := after;
     let new_ops = MySet.diff after before in
     let get_dest op = 
       match op with
       | V.Local id -> 
         let id' = convert_id id in
         append_alloc (id, id')
-      | _ -> ()
+      | Param _ -> ()
+      | _ -> err "unexpected input: decide_allocation"
     in
     List.iter get_dest (MySet.to_list new_ops);
     (* save old ops for next *)
     let old_op = MySet.diff before after in
-    old_ops := old_op;
     (* remove old ops in previous instr *)
     let remove_allocs op = 
       match op with
       | V.Local id -> free_alloc id;
       | _ -> ()
     in
-    List.iter remove_allocs (MySet.to_list !old_ops); 
+    List.iter remove_allocs (MySet.to_list old_op); 
   in
   let reg_of_instr instr =
     decide_allocation instr;
@@ -277,7 +274,7 @@ let trans_decl nreg lives (Vm.ProcDecl (lbl, nlocal, instrs)) =
     | _ -> append_instr [] (* begin, end *)
   in
   List.iter reg_of_instr instrs;
-  ProcDecl(lbl, get_nlocal (), !instrs_list)
+  ProcDecl(lbl, get_nlocal () + nreg, !instrs_list)
 
 (* entry point *)
 let trans nreg lives = List.map (trans_decl nreg lives)
