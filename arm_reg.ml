@@ -96,11 +96,11 @@ let gen_decl (Reg.ProcDecl(name, nlocal, instrs)) =
       (* step1: save A1, A2 registers to memory, set new arguments to A1, A2 registers *)
       append_stmt([Instr(Str(A1, RI(Sp, 0))); Instr(Str(A2, RI(Sp, 4)));] @ (gen_operand A1 f) @ (gen_operand A2 x));
       (* save registers to local *)
-      append_stmt(List.mapi (fun i reg -> Instr(Str(reg, local_access(nlocal-i-1)))) normal_regs);
+      (* append_stmt(List.mapi (fun i reg -> Instr(Str(reg, local_access(nlocal-i-1)))) normal_regs); *)
       (* jump to label *)
       append_stmt([Instr(Blx(reg_of_operand op))]);
       (* return registers to regs *)
-      append_stmt(List.mapi (fun i reg -> Instr(Ldr(reg, local_access(nlocal-i-1)))) normal_regs);
+      (* append_stmt(List.mapi (fun i reg -> Instr(Ldr(reg, local_access(nlocal-i-1)))) normal_regs); *)
       (* Step12: store result *)
       append_stmt(gen_dest A1 dest);
       (* Step13: reset 2 arguments *)
@@ -140,6 +140,8 @@ let gen_decl (Reg.ProcDecl(name, nlocal, instrs)) =
         )
     | Reg.Load(r, offset) -> append_stmt [Instr(Ldr(reg_of r, local_access offset))]
     | Reg.Store(r, offset) -> append_stmt [Instr(Str(reg_of r, local_access offset))]
+    | Reg.Save(r, offset) -> append_stmt [Instr(Str(reg_of r, local_access (nlocal - offset - 1)))]
+    | Reg.Restore(r, offset) -> append_stmt [Instr(Ldr(reg_of r, local_access (nlocal - offset - 1)))]
   in
   (* convert main instrs (store to arm_stmts) *)
   List.iter stmt_instr instrs;

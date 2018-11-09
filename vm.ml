@@ -35,6 +35,10 @@ type decl =
 
 type prog = decl list
 
+let is_label = function
+  | Label _ -> true
+  | _ -> false
+
 (* ==== Formatter ==== *)
 
 let string_of_binop = function

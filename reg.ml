@@ -3,6 +3,12 @@ module V = Vm
 exception Error of string
 let err s = raise (Error s)
 
+let debug = true
+
+let debug_string s = 
+  if debug 
+  then print_string (s ^ "\n")
+
 let select_random l =
   let len = List.length l in
   if len = 0 
@@ -44,6 +50,8 @@ type instr =
   | Return   of operand
   | Malloc   of dest * operand list
   | Read     of dest * operand * int
+  | Save     of reg * offset
+  | Restore  of reg * offset
 
 type decl =
     ProcDecl of label * int * instr list (* int: 局所領域の個数 *)
@@ -100,6 +108,12 @@ let string_of_instr idt tab = function
   | Read (t, v, i) ->
     idt ^ "read" ^ tab ^ string_of_dest t ^ " #" ^
     string_of_int i ^ "(" ^ string_of_operand v ^ ")"
+  | Save (r, oft) ->
+    idt ^ "save" ^ tab ^ "r" ^ string_of_int r ^ ", t" ^
+    string_of_int oft
+  | Restore (r, oft) ->
+    idt ^ "restore" ^ tab ^ "r" ^ string_of_int r ^ ", t" ^
+    string_of_int oft
 
 let string_of_decl (ProcDecl (lbl, n, instrs)) =
   "proc " ^ lbl ^ "(" ^ string_of_int n ^ ") =\n" ^
@@ -123,11 +137,10 @@ let offset_of_dest = function
   | L o -> o
 
 let trans_decl nreg lives (Vm.ProcDecl (lbl, nlocal, instrs)) =
+  debug_string ("converting decl: " ^ lbl);
   (* store generated instrs *)
   let instrs_list = ref ([]: instr list) in
   let append_instr d = instrs_list := (!instrs_list @ d) in
-  (* let old_ops = ref (MySet.empty: V.operand MySet.t) in *)
-  let previous_live = ref (MySet.empty: V.operand MySet.t) in
   (* manage offset *)
   let offset_counter = ref 0 in
   let get_new_offset () = 
@@ -136,8 +149,14 @@ let trans_decl nreg lives (Vm.ProcDecl (lbl, nlocal, instrs)) =
     r in
   (* manage allocation of Vm.id to dest *)
   let dest_alloc = ref (MyMap.empty: (V.id, dest) MyMap.t) in
+  let string_of_alloc () = 
+    String.concat ", "
+      (List.sort String.compare
+         (List.map (fun (id, ds) -> "(t" ^ string_of_int id  ^ ", " ^ string_of_dest ds ^ ")") 
+            (MyMap.to_list !dest_alloc))) in
   let append_alloc (id, d) = dest_alloc := MyMap.append id d !dest_alloc in
   let free_alloc id = dest_alloc := MyMap.remove id !dest_alloc in
+  let search_alloc id = MyMap.search id !dest_alloc in
   let alloc_status () = 
     let rec loop l raccum laccum =
       (match l with
@@ -155,8 +174,10 @@ let trans_decl nreg lives (Vm.ProcDecl (lbl, nlocal, instrs)) =
     List.length l_usage 
   in
   let get_free_reg () = 
-    let used = get_used_reg () in
-    List.filter (fun x -> not (List.exists (fun y -> y = x) used)) (List.init nreg (fun x -> x)) 
+    let used = MySet.from_list (get_used_reg ()) in
+    let all = MySet.from_list (List.init nreg (fun x -> x)) in
+    MySet.to_list (MySet.diff all used)
+    (* List.filter (fun x -> not (List.exists (fun y -> y = x) used)) (List.init nreg (fun x -> x))  *)
   in
   let convert_id id = 
     match MyMap.search id !dest_alloc with
@@ -225,34 +246,56 @@ let trans_decl nreg lives (Vm.ProcDecl (lbl, nlocal, instrs)) =
   in
   (* decide register allocation based on live analysis *)
   let live_bblock = Cfg.vm_to_cfg lbl instrs in
+  for i = 0 to (Array.length live_bblock - 1) do
+    print_string ("printing block #" ^ string_of_int i ^ "\n");
+    print_string ("labels are " ^ String.concat "," (MySet.to_list live_bblock.(i).labels) ^ "\n");
+    let stmts = live_bblock.(i).stmts in
+    for j = 0 to (Array.length stmts - 1) do
+      print_string (V.string_of_instr "" "" stmts.(j) ^ "\n")
+    done
+  done;
   let live_result = Dfa.solve (Live.make ()) live_bblock in
-  let get_property = Dfa.get_property live_result in
+  let get_property ins side = MySet.filter (fun x -> x <> (Vm.Local (-1))) (Dfa.get_property live_result ins side) in
   let decide_allocation instr =
-    let before = !previous_live in
-    let after = get_property instr Cfg.BEFORE in
-    previous_live := after;
+    let before = get_property instr Cfg.BEFORE in
+    debug_string ("before is " ^ String.concat ", " (List.map Vm.string_of_operand (MySet.to_list before)));
+    let after = get_property instr Cfg.AFTER in
+    debug_string ("after is " ^ String.concat ", " (List.map Vm.string_of_operand (MySet.to_list after)));
     let new_ops = MySet.diff after before in
+    debug_string ("new ops is " ^ String.concat ", " (List.map Vm.string_of_operand (MySet.to_list new_ops)));
+    (* make alloc containing only before and renew *)
+    let same_allocs = 
+      let rec loop op_list accum = 
+        match op_list with
+        | (Vm.Local id):: tl -> 
+          (let dest' = search_alloc id in
+           match dest' with
+           | Some dest -> loop tl ((id, dest):: accum)
+           | None -> err "unexpected failure in same_allocs")
+        | _:: tl -> loop tl accum
+        | [] -> accum in
+      MyMap.from_list (loop (MySet.to_list before) []) in
+    dest_alloc := same_allocs;
+    (* add new ops to alloc *)
     let get_dest op = 
       match op with
       | V.Local id -> 
         let id' = convert_id id in
         append_alloc (id, id')
-      | Param _ -> ()
-      | _ -> err "unexpected input: decide_allocation"
-    in
-    List.iter get_dest (MySet.to_list new_ops);
-    (* save old ops for next *)
-    let old_op = MySet.diff before after in
-    (* remove old ops in previous instr *)
-    let remove_allocs op = 
-      match op with
-      | V.Local id -> free_alloc id;
-      | _ -> ()
-    in
-    List.iter remove_allocs (MySet.to_list old_op); 
+      | Param _ -> () 
+      | _ -> err "unexpected input: decide_allocation" in
+    List.iter get_dest (MySet.to_list new_ops) in
+  (* save register to frame *)
+  let reg_save_space = ref 0 in
+  let update_save_space n = 
+    if !reg_save_space < n then reg_save_space := n;
+    debug_string ("updated save_spavce to " ^ string_of_int n )
   in
   let reg_of_instr instr =
-    decide_allocation instr;
+    if not (Vm.is_label instr)
+    then decide_allocation instr;
+    debug_string ("convert " ^ (Vm.string_of_instr "" "" instr) ^ " under the following allocation");
+    debug_string (string_of_alloc ());
     match instr with
     | V.Move(id, op) -> 
       let id' = convert_id id in
@@ -263,18 +306,36 @@ let trans_decl nreg lives (Vm.ProcDecl (lbl, nlocal, instrs)) =
       let id' = convert_id id in
       if is_register id' 
       then append_instr [BinOp(reg_of_dest id', bop, convert_op op1, convert_op op2)]
-      else append_instr [BinOp(reserved_reg, bop, convert_op op1, convert_op op2)]
+      else append_instr [BinOp(reserved_reg, bop, convert_op op1, convert_op op2); Store(reserved_reg, offset_of_dest id')]
     | V.Label l -> append_instr [Label l]
     | V.BranchIf(op, l) -> append_instr [BranchIf(convert_op op, l)]
     | V.Goto l -> append_instr [Goto l]
-    | V.Call(id, op, opl) -> append_instr [Call(convert_id id, convert_op op, List.map convert_op opl)]
+    | V.Call(id, op, opl) as ins ->
+      (* list of live operands after call *)
+      let live_ops_after = MySet.to_list (get_property ins Cfg.AFTER) in
+      let rec loop ops accum = 
+        match ops with
+        | (V.Local id'):: tl -> 
+          if id <> id' then
+            (match search_alloc id' with
+             | Some (R x) -> loop tl (x::accum)
+             | _ -> loop tl accum)
+          else loop tl accum
+        | _:: tl -> loop tl accum
+        | [] -> accum
+      in 
+      let regs_to_save = loop live_ops_after [] in
+      update_save_space (List.length regs_to_save);
+      append_instr(List.mapi (fun i r -> Save(r, i)) regs_to_save);
+      append_instr [Call(convert_id id, convert_op op, List.map convert_op opl)];
+      append_instr(List.mapi (fun i r -> Restore(r, i)) regs_to_save);
     | V.Return op -> append_instr [Return (convert_op op)]
     | V.Malloc(id, opl) -> append_instr [Malloc(convert_id id, List.map convert_op opl)]
     | V.Read(id, op, i) -> append_instr [Read(convert_id id, convert_op op, i)]
     | _ -> append_instr [] (* begin, end *)
   in
   List.iter reg_of_instr instrs;
-  ProcDecl(lbl, get_nlocal () + nreg, !instrs_list)
+  ProcDecl(lbl, get_nlocal () + !reg_save_space, !instrs_list)
 
 (* entry point *)
 let trans nreg lives = List.map (trans_decl nreg lives)
