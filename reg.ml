@@ -145,10 +145,10 @@ let trans_decl nreg lives (Vm.ProcDecl (lbl, nlocal, instrs)) =
   let instrs_list = ref ([]: instr list) in
   let append_instr d = instrs_list := (!instrs_list @ d) in
   (* manage local memory space *)
-  let local_space = ref 0 in
+  let save_space = ref 0 in
   let update_save_space n = 
-    if !local_space < n then local_space := n;
-    debug_string ("updated save_spavce to " ^ string_of_int n )
+    if !save_space < n then save_space := n;
+    debug_string ("updated save_space to " ^ string_of_int n )
   in
   (* allocation management >>> *)
   (* save allocations in other blocks *)
@@ -357,7 +357,7 @@ let trans_decl nreg lives (Vm.ProcDecl (lbl, nlocal, instrs)) =
   in
   (* >>> end trans_block *)
   Array.iteri (fun i blk -> process_block blk i) live_bblock;
-  ProcDecl(lbl, get_nlocal () + !local_space, !instrs_list)
+  ProcDecl(lbl, get_nlocal () + !save_space, !instrs_list)
 
 (* entry point *)
 let trans nreg lives = List.map (trans_decl nreg lives)

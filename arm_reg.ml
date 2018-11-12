@@ -33,7 +33,7 @@ let param_to_reg = function
   | 1 -> A2
   | i -> err ("invalid parameter: " ^ string_of_int i)
 
-let reg_of_operand op = 
+let reg_of_operand op =
   match op with
   | Reg.Param i -> param_to_reg i
   | Reg.Reg r -> reg_of r
