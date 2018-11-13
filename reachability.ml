@@ -3,7 +3,9 @@ open Cfg
 open Dfa
 module Set = MySet
 
-let dummy = Local (-1)
+type def = (Vm.id * Vm.operand)
+
+let dummy: def = (-1, Local (-1))
 
 (* compares which set is greater *)
 let compare left right =
@@ -16,13 +18,11 @@ let compare left right =
 let string_of_vars vs =
   String.concat ", "
     (List.sort String.compare
-       (List.map Vm.string_of_operand
+       (List.map (fun (id, op) -> "(t" ^ string_of_int id ^ ", " ^ Vm.string_of_operand op ^ ")" )
           (List.filter (fun v -> v <> dummy) (Set.to_list vs))))
 
-(* TODO *)
 let lub = Set.union 
 
-(* TODO *)
 let filter_vars vs =
   Set.from_list (List.filter (fun v ->
       match v with
@@ -30,34 +30,26 @@ let filter_vars vs =
       | Proc _ | IntV _ -> false
     ) (Set.to_list vs))
 
-let transfer (entry_vars: Vm.operand Set.t) (stmt: Vm.instr): Vm.operand Set.t = 
+let transfer (entry_vars: def Set.t) (stmt: Vm.instr): def Set.t = 
   let gen vs =
     lub
-      (filter_vars (match stmt with
-             Move (dst, src) -> Set.singleton src
-           | BinOp (dst, op, l, r) -> Set.from_list [l; r]
-           | BranchIf (c, l) -> Set.singleton c
-           | Call (dst, tgt, args) -> Set.insert tgt (Set.from_list args)
-           | Return v -> Set.singleton v
-           | Malloc (dst, vs) -> Set.from_list vs
-           | Read (dst, v, i) -> Set.singleton v
-           | _ -> Set.empty
-         ))
+      (match stmt with
+       | Move (dst, src) -> Set.singleton (dst, src)
+       | _ -> Set.empty
+      )
       vs in
   let kill vs =
     match stmt with
-      Move (dst, _)
-    | BinOp (dst, _, _, _)
-    | Call (dst, _, _)
-    | Malloc (dst, _)
-    | Read (dst, _, _) -> Set.remove (Local dst) vs
+    | Move(dst, src) -> 
+      (let map = Map.from_list (Set.to_list entry_vars) in
+       match Map.search dst map with
+       | Some _ -> MySet.remove (dst, src) vs
+       | None -> vs)
     | _ -> vs in
-  let kill' = kill entry_vars in
-  (* TODO *)
-  lub (gen entry_vars) (Set.from_list(List.filter (fun x -> not (MySet.member x kill')) (MySet.to_list entry_vars)))
+  gen (kill entry_vars)
 
 (* make reachability analyzer *)
-let make (): Vm.operand Set.t Dfa.analysis = 
+let make (): def Set.t Dfa.analysis = 
   {
     direction = FORWARD;
     transfer = transfer;
