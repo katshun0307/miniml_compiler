@@ -88,8 +88,8 @@ def main():
     if sys.argv[1]:
         in_file = sys.argv[1]
         in_name = os.path.splitext(os.path.basename(in_file))[0]
-        run(in_file, "%s_opt.c" % in_name, False, True, True)
-        run(in_file, "%s_no_opt.c" % in_name, False, True, True)
+        run(in_file, "%s_opt.c" % in_name, False, False, True)
+        run(in_file, "%s_no_opt.c" % in_name, False, False, False)
         run(in_file, "%s_noreg_noopt_.s" % in_name, True, False, False)
         run(in_file, "%s_noreg_opt.s" % in_name, True, False, True)
         run(in_file, "%s_reg_noopt.s" % in_name, True, True, False)
@@ -98,4 +98,3 @@ def main():
 
 if __name__ == "__main__":
     main()
-
