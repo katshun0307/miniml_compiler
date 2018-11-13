@@ -1,9 +1,17 @@
 let debug = ref false
+let detail = ref false
+
 let dprint s = if !debug then (print_string (s ()) ; flush stdout)
 let simulation = ref false
 
 let display_cfg = ref false
 let optimize = ref false
+
+let optimize_options = ref ({
+    dead = false;
+    simple = false;
+    fold = false
+  }: Opt.opt_configs)
 
 let outfile = ref "-"
 
@@ -41,7 +49,7 @@ let rec compile prompt ichan cont =
     if !optimize then
       (* Low-level opt. (7章 DFA & 最適化) *)
 
-      let regcode = Opt.optimize !display_cfg Arm_spec.nreg vmcode in
+      let regcode = Opt.optimize !display_cfg Arm_spec.nreg vmcode !optimize_options !detail in
       dprint (fun () ->
           "\n(* [Reg code] *)\n" ^ (Reg.string_of_reg regcode) ^ "\n");
       (* Convert to ARM assembly (7章 コード生成(レジスタ利用版)) *)
@@ -58,7 +66,7 @@ let rec compile prompt ichan cont =
 
   if !simulation
   then print_string "\n(* simulated statements *)\n";
-  let state = Arm_simulator.simulate armcode in
+  let state = Arm_simulator.simulate armcode !detail in
   (print_string ("\n(* [Simulation result] *)\n" ^
                  (Arm_simulator.string_of_state state) ^ "\n");
    flush stdout);
@@ -83,6 +91,7 @@ let aspec = Arg.align [
     ("-v", Arg.Unit (fun () -> debug := true),
      " Print debug info (default: " ^ (string_of_bool !debug) ^ ")");
     ("-vv", Arg.Unit (fun () -> detail := true),
+     " Print many many many debug info (default: " ^ (string_of_bool !detail) ^ ")");
     ("-s", Arg.Unit (fun () -> simulation := true),
      " Print simulation result (default: " ^ (string_of_bool !simulation) ^ ")");
     ("-os", Arg.Unit (fun () -> !optimize_options.simple <- true),
