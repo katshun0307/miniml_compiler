@@ -135,7 +135,7 @@ let offset_of_dest = function
   | R _ -> err "is not offset"
   | L o -> o
 
-let trans_decl nreg lives (Vm.ProcDecl (lbl, nlocal, instrs))  =
+let trans_decl nreg (Vm.ProcDecl (lbl, nlocal, instrs))  =
   debug_string ("converting decl: " ^ lbl);
   (* 生存変数解析を実施 *)
   let live_bblock = Cfg.vm_to_cfg lbl instrs in
@@ -356,6 +356,6 @@ let trans_decl nreg lives (Vm.ProcDecl (lbl, nlocal, instrs))  =
   ProcDecl(lbl, get_nlocal () + !save_space, !instrs_list)
 
 (* entry point *)
-let trans nreg lives vmcode v = 
+let trans nreg vmcode v = 
   verbose := v;
-  List.map (trans_decl nreg lives) vmcode
+  List.map (trans_decl nreg) vmcode

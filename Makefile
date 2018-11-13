@@ -16,7 +16,7 @@ OBJS=misc.cmo mySet.cmo myMap.cmo pretty.cmo \
 	flat.cmo vm.cmo arm_spec.cmo arm_noreg.cmo \
 	cfg.cmo dfa.cmo live.cmo reachability.cmo copy.cmo reg.cmo \
 	arm_simulator.cmo \
-	opt.cmo arm_reg.cmo main.cmo
+	opt.cmo arm_reg.cmo c_spec.cmo backend.cmo main.cmo
 
 DEPEND += lexer.ml parser.ml
 
