@@ -79,13 +79,13 @@ let rec compile prompt ichan cont =
 
 let srcfile = ref "-"
 
-let usage = "Usage: " ^ Sys.argv.(0) ^ " [-vOGs] [-AO] [-od] [-oc] [-of] [-o ofile] [file]"
+let usage = "Usage: " ^ Sys.argv.(0) ^ " [-vOGs] [-os] [-of] [-od] [-o ofile] [file]"
 
 let aspec = Arg.align [
     ("-o", Arg.Set_string outfile,
      " Set output file (default: stdout)");
-    ("-O", Arg.Unit (fun () -> optimize := true),
-     " Perform optimization (default: " ^ (string_of_bool !optimize) ^ ")");
+    ("-O", Arg.Unit (fun () -> optimize := true; !optimize_options.simple <- true; !optimize_options.fold <- true; !optimize_options.dead <- true),
+     " perform all optimization (default: " ^ (string_of_bool false) ^ ")");
     ("-G", Arg.Unit (fun () -> display_cfg := true),
      " Display CFG (default: " ^ (string_of_bool !display_cfg) ^ ")");
     ("-v", Arg.Unit (fun () -> debug := true),
@@ -94,14 +94,12 @@ let aspec = Arg.align [
      " Print many many many debug info (default: " ^ (string_of_bool !detail) ^ ")");
     ("-s", Arg.Unit (fun () -> simulation := true),
      " Print simulation result (default: " ^ (string_of_bool !simulation) ^ ")");
-    ("-os", Arg.Unit (fun () -> !optimize_options.simple <- true),
+    ("-os", Arg.Unit (fun () -> optimize := true; !optimize_options.simple <- true),
      " simple optimization (default: " ^ (string_of_bool !optimize_options.simple) ^ ")");
-    ("-of", Arg.Unit (fun () -> !optimize_options.fold <- true),
+    ("-of", Arg.Unit (fun () -> optimize := true; !optimize_options.fold <- true),
      " fold optimization (default: " ^ (string_of_bool !optimize_options.fold) ^ ")");
-    ("-od", Arg.Unit (fun () -> !optimize_options.dead <- true),
+    ("-od", Arg.Unit (fun () -> optimize := true; !optimize_options.dead <- true),
      " dead code elimination (default: " ^ (string_of_bool !optimize_options.dead) ^ ")");
-    ("-AO", Arg.Unit (fun () -> !optimize_options.simple <- true; !optimize_options.fold <- true; !optimize_options.dead <- true),
-     " perform all optimization (default: " ^ (string_of_bool false) ^ ")");
   ]
 
 let main () =
