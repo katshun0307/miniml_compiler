@@ -71,7 +71,7 @@ let rec compile prompt ichan cont =
 
 let srcfile = ref "-"
 
-let usage = "Usage: " ^ Sys.argv.(0) ^ " [-vOG] [-o ofile] [file]"
+let usage = "Usage: " ^ Sys.argv.(0) ^ " [-vOGs] [-AO] [-od] [-oc] [-of] [-o ofile] [file]"
 
 let aspec = Arg.align [
     ("-o", Arg.Set_string outfile,
@@ -82,8 +82,17 @@ let aspec = Arg.align [
      " Display CFG (default: " ^ (string_of_bool !display_cfg) ^ ")");
     ("-v", Arg.Unit (fun () -> debug := true),
      " Print debug info (default: " ^ (string_of_bool !debug) ^ ")");
+    ("-vv", Arg.Unit (fun () -> detail := true),
     ("-s", Arg.Unit (fun () -> simulation := true),
      " Print simulation result (default: " ^ (string_of_bool !simulation) ^ ")");
+    ("-os", Arg.Unit (fun () -> !optimize_options.simple <- true),
+     " simple optimization (default: " ^ (string_of_bool !optimize_options.simple) ^ ")");
+    ("-of", Arg.Unit (fun () -> !optimize_options.fold <- true),
+     " fold optimization (default: " ^ (string_of_bool !optimize_options.fold) ^ ")");
+    ("-od", Arg.Unit (fun () -> !optimize_options.dead <- true),
+     " dead code elimination (default: " ^ (string_of_bool !optimize_options.dead) ^ ")");
+    ("-AO", Arg.Unit (fun () -> !optimize_options.simple <- true; !optimize_options.fold <- true; !optimize_options.dead <- true),
+     " perform all optimization (default: " ^ (string_of_bool false) ^ ")");
   ]
 
 let main () =

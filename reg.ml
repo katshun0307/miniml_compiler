@@ -263,11 +263,7 @@ let trans_decl nreg lives (Vm.ProcDecl (lbl, nlocal, instrs)) =
     (* process label *)
     let is_proc_name s = 
       String.sub s 0 4 = "_b__" || s = "_toplevel" in
-    (match MySet.to_list blk.labels with
-     | [] -> ()
-     | l :: [] -> if not (is_proc_name l)
-       then append_instr [Label l]
-     | _ -> err "expected only 1 label per block");
+    append_instr (List.map (fun l -> Label l) (List.filter (fun l -> not (is_proc_name l)) (MySet.to_list blk.labels)));
     (* load allocation of predecessor *)
     allocation := MyMap.from_list(
         MySet.to_list(

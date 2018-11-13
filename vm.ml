@@ -39,6 +39,10 @@ let is_label = function
   | Label _ -> true
   | _ -> false
 
+let is_reg = function
+  | Param _ | Local _ -> true
+  | _ -> false
+
 (* ==== Formatter ==== *)
 
 let string_of_binop = function
