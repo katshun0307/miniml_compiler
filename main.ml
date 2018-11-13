@@ -15,7 +15,8 @@ let regcode = ref false
 let optimize_options = ref ({
     dead = false;
     simple = false;
-    fold = false
+    fold = false;
+    verbose = false
   }: Opt.opt_configs)
 
 let outfile = ref "-"
@@ -78,11 +79,11 @@ let rec compile prompt ichan cont =
     if !outfile <> "-" then close_out ochan;
 
     if !simulation
-    then print_string "\n(* simulated statements *)\n";
-    let state = Arm_simulator.simulate armcode !detail in
-    (print_string ("\n(* [Simulation result] *)\n" ^
-                   (Arm_simulator.string_of_state state) ^ "\n");
-     flush stdout);
+    then (print_string "\n(* simulated statements *)\n";
+          let state = Arm_simulator.simulate armcode !detail in
+          (print_string ("\n(* [Simulation result] *)\n" ^
+                         (Arm_simulator.string_of_state state) ^ "\n");
+           flush stdout));
 
     (* if C code *)
   else
@@ -131,7 +132,7 @@ let aspec = Arg.align [
      " generate regcode (default: " ^ (string_of_bool !regcode) ^ ")");
     ("-G", Arg.Unit (fun () -> display_cfg := true),
      " Display CFG (default: " ^ (string_of_bool !display_cfg) ^ ")");
-    ("-v", Arg.Unit (fun () -> debug := true),
+    ("-v", Arg.Unit (fun () -> debug := true; !optimize_options.verbose <- true),
      " Print debug info (default: " ^ (string_of_bool !debug) ^ ")");
     ("-vv", Arg.Unit (fun () -> detail := true),
      " Print many many many debug info (default: " ^ (string_of_bool !detail) ^ ")");
