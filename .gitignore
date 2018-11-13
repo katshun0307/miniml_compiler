@@ -18,6 +18,11 @@ _build*
 *.tex
 !report*.tex
 !report*.pdf
+benchmarks/
+!benchmarks/benchmark.py
+benchmarks/*.c
+benchmarks/*.out
+benchmarks/*.s
 parser.ml
 parser.mli
 lexer.ml

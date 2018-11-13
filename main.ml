@@ -1,6 +1,8 @@
 let debug = ref false
 let detail = ref false
 
+let src_file = ref "-"
+
 let dprint s = if !debug then (print_string (s ()) ; flush stdout)
 
 let display_cfg = ref false
@@ -121,6 +123,8 @@ let usage = "Usage: " ^ Sys.argv.(0) ^ " [-vOGs] [-os] [-of] [-od] [-o ofile] [f
 let aspec = Arg.align [
     ("-o", Arg.Set_string outfile,
      " Set output file (default: stdout)");
+    ("-i", Arg.Set_string src_file,
+     " name of source file(default: " ^ !src_file ^ ")");
     ("-O", Arg.Unit (fun () -> optimize := true; !optimize_options.simple <- true; !optimize_options.fold <- true; !optimize_options.dead <- true),
      " perform all optimization and regcode (default: " ^ (string_of_bool false) ^ ")");
     ("-reg", Arg.Unit (fun () -> regcode := true),
@@ -147,12 +151,12 @@ let aspec = Arg.align [
 
 let main () =
   Arg.parse aspec (fun s -> srcfile := s) usage;
-  if !srcfile = "-" then
+  if !src_file = "-" then
     let c = stdin in
     let rec k () = compile "# " c k in
     compile "# " c k
   else
-    let c = open_in !srcfile in
+    let c = open_in !src_file in
     let rec k () = close_in c in
     compile "" c k
 
