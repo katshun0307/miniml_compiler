@@ -1,0 +1,5 @@
+loop v = (1, 0) in
+if v.1 < 101 then
+  recur (v.1 + 1, v.1 + v.2)
+else
+  v.2;;

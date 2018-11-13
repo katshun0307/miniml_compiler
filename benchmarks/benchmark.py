@@ -1,4 +1,5 @@
 import os
+import sys
 
 start_string = "_toplevel:\n"
 end_string = "\tb\t_toplevel_ret\n"
@@ -13,7 +14,7 @@ c_start_timer_string = "\tclock_t begin = clock();\n"
 c_stop_timer_string = """
     clock_t end = clock();
     double time_spent = (double)(end - begin) / CLOCKS_PER_SEC;
-    printf("%f seconds\\n", time_spent);
+    printf("cpu time:\t%f seconds\\n", time_spent);
     """
 
 
@@ -59,7 +60,7 @@ def append_c_timer(filename):
 
 
 def make_command(inname, outname, is_arm, is_reg, is_opt):
-    base = "ledit ./minimlc -i %s -o %s" % (inname, outname)
+    base = "./minimlc -i %s -o %s" % (inname, outname)
     if not is_arm:
         base += " -b "
     if is_reg:
@@ -84,9 +85,17 @@ def run(inname, outname, is_arm, is_reg, is_opt):
 
 
 def main():
-    # run("test.mml", "test_out1.s", True, True, True)
-    run("test.mml", "test_out2.c", False, True, False)
+    if sys.argv[1]:
+        in_file = sys.argv[1]
+        in_name = os.path.splitext(os.path.basename(in_file))[0]
+        run(in_file, "%s_opt.c" % in_name, False, False, True)
+        run(in_file, "%s_no_opt.c" % in_name, False, False, False)
+        run(in_file, "%s_noreg_noopt_.s" % in_name, True, False, False)
+        run(in_file, "%s_noreg_opt.s" % in_name, True, False, True)
+        run(in_file, "%s_reg_noopt.s" % in_name, True, True, False)
+        run(in_file, "%s_reg_opt.s" % in_name, True, True, True)
 
 
 if __name__ == "__main__":
     main()
+

@@ -7,7 +7,8 @@ let err s = raise (Error s)
 type opt_configs = {
   mutable dead: bool;
   mutable simple: bool;
-  mutable fold: bool
+  mutable fold: bool;
+  mutable verbose: bool
 }
 (* 複数の CFG を解析し，結果を1つの結果にマージ
    結果は Vm.instr をキーとするマップ(の組)であり，各キーは
@@ -111,7 +112,8 @@ let optimize is_disp_cfg nreg vmcode options  =
   let lv = Live.make () in
   (* その他，各種最適化 *)
   let vmcode' = opt vmcode options in
-  print_string ("(* optimized vm code*)\n" ^ Vm.string_of_vm vmcode');
+  if options.verbose then
+    print_string ("(* optimized vm code*)\n" ^ Vm.string_of_vm vmcode');
   (* 生存変数解析を実行 *)
   let cfgs = Cfg.build vmcode' in
   let lv_results = analyze_cfg lv cfgs in
