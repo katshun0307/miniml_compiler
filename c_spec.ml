@@ -12,6 +12,7 @@ type ty =
   | Closure 
   | Tuple 
   | Defined
+  | IntPointer
 
 type op =
   | Var of id
@@ -26,12 +27,14 @@ type exp =
   | Return of op (* return op *)
   | Print of op
   | Read of id * op * int (* id = op[int] *)
+  | ReadClosure of id * id * int (* read out_of_scope vars in closure*)
   | Label of label
   | Goto of label
-  | Call of id * id * id * op (* id = id(id.vars, x) *)
+  | Call of ty * id * id * id * op (* id = id(id.vars, x) *)
   | DeclareTuple of id * int
   | SetTupleValue of id * int * op
   | DeclareClosure of id (* closure aru_closure; *)
+  | GetPointerOfClosure of id * id
   | SetClosurePointer of id * label (* aru_cl osure.f = b__recf00 *)
   | SetClosureLength of id * int (* aru_closure.length = 2 *)
   | DeclareClosureParams of int (* int params[i]; *)
@@ -47,9 +50,10 @@ type funct = Funct of id * (id list) * (exp list)
 
 let string_of_ty = function
   | Int -> "int"
-  | Closure -> "closure"
+  | Closure -> "closure*"
   | Tuple -> "int*"
   | Defined -> ""
+  | IntPointer -> "int*"
 
 let string_of_id (id: id) = (id: string)
 
@@ -75,19 +79,21 @@ let rec string_of_exp exp =
     | Return op -> ["return"; string_of_op op]
     | Print op -> ["printf(\"%d\\n\", " ^ string_of_op op ^ ")"]
     | Read(sid, rop, i) -> ["int"; string_of_id sid; "="; string_of_op rop ^ "[" ^  string_of_int i ^ "]"]
+    | ReadClosure(id, id2, i) -> ["int"; id; "="; id2 ^ "->vars[" ^ string_of_int i ^ "]"]
     | Label(l) -> [l ^ ":"]
     | Goto(l) -> ["goto"; l]
-    | Call(dest, pointer, closure, x) -> ["int"; dest; "="; pointer ^ "(" ^ closure ^ ".vars,"; string_of_op x ^ ")"]
+    | Call(ty, dest, pointer, closure, x) -> [string_of_ty ty; dest; "="; pointer ^ "(" ^ closure ^ ","; string_of_op x ^ ")"]
     | DeclareTuple(id, i) -> ["int"; id ^ "[" ^ string_of_int i ^ "]"]
     | SetTupleValue(id, i, op) -> [id ^ "[" ^ string_of_int i ^ "]"; "="; string_of_op op]
     | DeclareClosure(id) -> ["closure"; id]
-    | SetClosurePointer(id, l) -> [id ^ ".f"; "="; l]
-    | SetClosureLength(id, i) -> [id ^ ".length"; "="; string_of_int i]
+    | GetPointerOfClosure(id1, id2) -> ["closure*"; id1; "="; "&" ^ id2]
+    | SetClosurePointer(id, l) -> [id ^ "->f"; "="; l]
+    | SetClosureLength(id, i) -> [id ^ "->length"; "="; string_of_int i]
     | DeclareClosureParams(i) -> ["int"; "params[" ^ string_of_int i ^ "]"]
     | StoreClosureParams(i, op) -> ["params[" ^ string_of_int i ^ "]"; "="; string_of_op op]
-    | SetClosureParams id -> [id ^ ".vars"; "="; "params"]
-    | DeclarePointer(id) -> ["int (*" ^ id ^ ")(const int*, const int)"]
-    | AssignPointer(id1, id2) -> [id1; "="; id2 ^ ".f"]
+    | SetClosureParams id -> [id ^ "->vars"; "="; "params"]
+    | DeclarePointer(id) -> ["int (*" ^ id ^ ")(closure*, const int)"]
+    | AssignPointer(id1, id2) -> [id1; "="; id2 ^ "->f"]
     | Exit -> ["return 0"]
     (* | SetClosureVars(id, opl) *)
     (* | _ -> err "not implemented" *)
@@ -100,7 +106,7 @@ let string_of_funct (Funct(id, pl, el)) =
   let string_of_pl = 
     match pl with
     | [] -> ""
-    | [p0; p1] -> "const int *" ^ p0 ^ ", " ^ "const int " ^ p1
+    | [p0; p1] -> "closure *" ^ p0 ^ ", " ^ "const int " ^ p1
     | _ -> err "unexpected number of params" in
   "int " ^ id ^ "(" ^ string_of_pl ^ "){\n" ^ string_of_exp_list el ^ "}\n\n"
 
