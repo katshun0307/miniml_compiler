@@ -68,7 +68,10 @@ let c_of_decl (Vm.ProcDecl(lbl, local_var, instr_list)): funct =
       let ty = if id_was_defined then Defined 
         else (if is_closure then Closure else if is_tuple then Tuple else Int) in
       [Decl(ty, convert_id id, convert_op op)]
-    | V.BinOp(id, binop, op1, op2) -> [Bin(convert_id id, binop, Exp(convert_op op1), Exp(convert_op op2))]
+    | V.BinOp(id, binop, op1, op2) ->
+      let id' = convert_id id in
+      append_defined id';
+      [Bin(convert_id id, binop, Exp(convert_op op1), Exp(convert_op op2))]
     | V.Label l -> [C_spec.Label l]
     | V.BranchIf(op, l) -> [If(convert_op op, Goto(l)) ]
     | V.Goto l -> [Goto l]
