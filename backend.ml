@@ -26,7 +26,7 @@ let c_of_decl (Vm.ProcDecl(lbl, local_var, instr_list)): funct =
   let id_is_tuple (id: id) = MySet.member id !tuple_var in
   let id_is_defined (id:  id) = MySet.member id !defined_var in
   let op_is_closure = function
-    | Var id -> id_is_closure id
+    | Var id -> if id = param0_name then true else id_is_closure id
     | Imm _ -> false in
   let op_is_tuple = function
     | Var id -> id_is_tuple id
@@ -43,6 +43,8 @@ let c_of_decl (Vm.ProcDecl(lbl, local_var, instr_list)): funct =
   let id_of_op op = 
     match op with 
     | V.Local id -> convert_id id
+    | V.Param i -> 
+      if i = 0 then param0_name else if i = 1 then param1_name else err "unexpected param index"
     | _ -> err "id_of_exp: unexpected input" in
   let convert_op op = 
     match op with
@@ -71,8 +73,9 @@ let c_of_decl (Vm.ProcDecl(lbl, local_var, instr_list)): funct =
     | V.BranchIf(op, l) -> [If(convert_op op, Goto(l)) ]
     | V.Goto l -> [Goto l]
     | V.Call(dest, op, opl) -> 
+      let type_ = if id_is_defined (convert_id dest) then Defined else Int in
       (match opl with
-       | closure:: x:: [] -> [Call(convert_id dest, id_of_op op, id_of_op closure, convert_op x)]
+       | closure:: x:: [] -> [Call(type_, convert_id dest, id_of_op op, id_of_op closure, convert_op x)]
        | _ -> err "unexpected function call")
     | V.Return op -> if lbl = "_toplevel" 
       then [Print(convert_op op); Exit]
@@ -86,7 +89,8 @@ let c_of_decl (Vm.ProcDecl(lbl, local_var, instr_list)): funct =
            append_defined closure_name;
            let funct_name = label_of_proc pointer in
            let var_len = List.length vars in
-           [DeclareClosure closure_name; SetClosurePointer(closure_name, funct_name);
+           [DeclareClosure (closure_name ^ "__"); GetPointerOfClosure(closure_name, closure_name ^ "__");
+            SetClosurePointer(closure_name, funct_name);
             SetClosureLength (closure_name, var_len + 1); DeclareClosureParams(var_len + 1)] @
            (List.mapi (fun i op -> StoreClosureParams(i+1, convert_op op)) vars) @
            [SetClosureParams closure_name;]
@@ -98,10 +102,11 @@ let c_of_decl (Vm.ProcDecl(lbl, local_var, instr_list)): funct =
            List.mapi (fun i op -> SetTupleValue(id', i, convert_op op)) opl
        | _ -> err "undefined")
     | V.Read(id, op, i) -> 
+      let id' = convert_id id in
       if op_is_closure (convert_op op) then 
-        (if i = 0 
-         then [DeclarePointer(convert_id id); AssignPointer(convert_id id, id_of_op op)]
-         else [Read(convert_id id, convert_op op, i)])
+        (if i = 0 (* get pointer in closure *)
+         then [DeclarePointer(id'); AssignPointer(id', id_of_op op)]
+         else [ReadClosure(id', id_of_op op, i)])
       else [Read(convert_id id, convert_op op, i)]
     | V.BEGIN _ -> err "error"
     | V.END _ -> err "error" in
