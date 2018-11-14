@@ -1,0 +1,328 @@
+\input{default}
+
+\begin{document}
+
+\title{計算機科学実験レポート3 タスク10}
+\author{1029-28-9483 勝田 峻太朗}
+\date{\today}
+
+\maketitle
+
+\section*{課題10 (任意: バックエンドの移植)}
+
+\begin{quotation}
+ARMアセンブリコードではなくC言語コードへ変換するコード生成器を作成し,性能比較を行いなさい.
+\end{quotation}
+
+
+\subsection*{C言語への変換の方針}
+
+\subsubsection*{代入文}
+
+\begin{lstlisting}
+<type_of_src> dst = src
+\end{lstlisting}
+
+ただし,\lstinline{<type_of_src>} には,\lstinline{"closure"(クロージャ), "int"(数), "int*"(配列), ""(すでに定義されている)}
+のいずれかが入る.
+
+例として, ソースコード\ref{ml-assignment}の変換結果は ソースコード\ref{c-assignment} のようななる.
+
+\begin{lstlisting}[label=ml-assignment, caption=MLコードの例]
+let a = 3 in let b = a in 0;;
+\end{lstlisting}
+
+\begin{lstlisting}[language=C, label=c-assignment, caption=変換後のC言語]
+int main(){
+
+int var00 = 3;
+int var10 = var00;
+int var30 = 0;
+printf("%d\n", var30);
+return 0;
+}
+\end{lstlisting}
+
+
+\subsubsection*{labelとgoto文}
+
+\begin{lstlisting}
+<labelname>:;
+<some operation>
+<some operation>
+goto <labelname>;
+\end{lstlisting}
+
+のような形で,C言語のgoto文を用いて実装する.
+
+\subsubsection*{クロージャと関数呼び出し}
+
+クロージャは, 以下のような struct を用いて実装した.
+
+\begin{lstlisting}[language=C, caption=C言語でのクロージャの実装]
+typedef struct{
+    int (*f)(const int*, const int);
+    int* vars;
+    int length;
+
+} closure;
+\end{lstlisting}
+
+$f$は,第1要素目の関数ポインタ(クロージャの第0要素)を表し,$vars$は,スコープ外変数の列(クロージャの第1要素以降)を表す.
+$length$は,$vars$の長さを保持する.(ただし実装では用いられていない.)
+
+また, 混乱を避けるため,クロージャの第1要素は$vars$の第0要素ではなく,第1要素に格納される.
+
+例えば,ソースコード\ref{ml-closure-ex}は,ソースコード\ref{c-closure-ex}のように変換される.
+
+\begin{lstlisting}[caption=クロージャを含むMLコード, label=ml-closure-ex]
+let a = 1 in let b = 2 in let rec f x = x + a + b in f 5;;
+\end{lstlisting}
+
+\begin{lstlisting}[caption=クロージャの変換例, language=C, label=c-closure-ex]
+#include <stdio.h>
+#include <stdlib.h>
+
+typedef struct{
+    int (*f)(const int*, const int);
+    int* vars;
+    int length;
+
+} closure;
+
+int _b__recf10(const int *param_0, const int param_1){
+
+int var02 = param_0[2];
+int var12 = param_1;
+int var21 = param_0[1];
+int var32 = var12 + var02;
+int var51 = var32 + var21;
+return var51;
+}
+
+int main(){
+
+int var03 = 1;
+int var13 = 2;
+closure var22;
+var22.f = _b__recf10;
+var22.length = 3;
+int params[3];
+params[1] = var13;
+params[2] = var03;
+var22.vars = params;
+closure var33 = var22;
+int var40 = 5;
+int (*var52)(const int*, const int);
+var52 = var33.f;
+int var70 = var52(var33.vars, var40);
+printf("%d\n", var70);
+return 0;
+}
+\end{lstlisting}
+
+
+\subsection*{C言語の構造の定義}
+
+C言語上で使用する命令を, $c\_spec.ml$において,定義した.
+
+\begin{lstlisting}[caption=c\_spec.mlにおけるC言語の構造定義]
+(* variable names *)
+type id = string
+type label = string
+type imm = int
+type binop = Syntax.binOp
+
+type ty = 
+  | Int
+  | Closure 
+  | Tuple 
+  | Defined
+
+type op =
+  | Var of id
+  | Imm of imm
+
+type exp = 
+  | Decl of ty * id * op (* int id = op *)
+  | Exp of op (* operand *)
+  | Bin of id * binop * exp * exp 
+  | If of op * exp 
+  | Write of id * int * op (* id[i] = op *)
+  | Return of op (* return op *)
+  | Print of op
+  | Read of id * op * int (* id = op[int] *)
+  | Label of label
+  | Goto of label
+  | Call of id * id * id * op (* id = id(id.vars, x) *)
+  | DeclareTuple of id * int
+  | SetTupleValue of id * int * op
+  | DeclareClosure of id (* closure aru_closure; *)
+  | SetClosurePointer of id * label (* aru_closure.f = b__recf00 *)
+  | SetClosureLength of id * int (* aru_closure.length = 2 *)
+  | DeclareClosureParams of int (* int params[i]; *)
+  | StoreClosureParams of int * op (* params[i] = op *)
+  | SetClosureParams of id (* aru_closure.vars = params *)
+  | DeclarePointer of id
+  | AssignPointer of id * id (* id = id.f *)
+  | Exit
+
+type funct = Funct of id * (id list) * (exp list)
+\end{lstlisting}
+
+\subsection*{VMコードからC言語への変換}
+
+VMコードから\lstinline{c_spec.ml}で示したC言語の構造への変換は\lstinline{c_of_decl}関数を用いて行った.
+
+ただし, \lstinline{ref}型の値は以下の内容を持つ.
+
+\begin{description}
+
+\item[var\_assoc] \hfill
+
+$Vm.id$か$id$への変換を保持する.
+
+\item[closure\_var] \hfill
+
+中身がクロージャである$id$集合を保持する.
+
+\item[tuple\_var]  \hfill
+
+中身が(クロージャではなく)tupleである$id$集合を保持する.
+
+\item[defined\_var] \hfill
+
+すでに定義された変数集合を保持する.
+
+\end{description}
+
+\begin{lstlisting}[caption=backend.ml - C言語への変換]
+let c_of_decl (Vm.ProcDecl(lbl, local_var, instr_list)): funct =
+  (* helper definitions and functions *)
+  let var_assoc = ref (MyMap.empty: (V.id, id) MyMap.t) in
+  let closure_var = ref (MySet.empty: id MySet.t) in
+  let tuple_var = ref (MySet.empty: id MySet.t) in
+  let defined_var = ref (MySet.empty: id MySet.t) in
+  let id_is_closure (id: id) = MySet.member id !closure_var in
+  let id_is_tuple (id: id) = MySet.member id !tuple_var in
+  let id_is_defined (id:  id) = MySet.member id !defined_var in
+  let op_is_closure = function
+    | Var id -> id_is_closure id
+    | Imm _ -> false in
+  let op_is_tuple = function
+    | Var id -> id_is_tuple id
+    | Imm _ -> false in
+  let append_closure id = closure_var := MySet.insert id !closure_var in
+  let append_tuple id = tuple_var := MySet.insert id !tuple_var in
+  let append_defined id = defined_var := MySet.insert id !defined_var in
+  let convert_id id = 
+    match MyMap.search id !var_assoc with
+    | Some id' -> id'
+    | None -> let id' = fresh_var (string_of_int id) in
+      var_assoc := MyMap.append id id' !var_assoc;
+      id' in
+  let id_of_op op = 
+    match op with 
+    | V.Local id -> convert_id id
+    | _ -> err "id_of_exp: unexpected input" in
+  let convert_op op = 
+    match op with
+    | V.Param i -> if i = 0 then Var param0_name
+      else Var param1_name
+    | V.Local id -> Var (convert_id id)
+    | V.IntV i -> Imm i
+    | V.Proc l -> Var ("unexpected_" ^ l) in
+  (* end helper definition and functions *)
+  let rec c_of_instr instr = 
+    match instr with 
+    | V.Move(id, op) -> 
+      let id' = convert_id id in
+      let op' = convert_op op in
+      let id_was_defined = id_is_defined id' in
+      let is_closure = op_is_closure op' in
+      let is_tuple = op_is_tuple op' in
+      if is_closure then append_closure id';
+      if is_tuple then append_tuple id';
+      append_defined id';
+      let ty = if id_was_defined then Defined 
+        else (if is_closure then Closure else if is_tuple then Tuple else Int) in
+      [Decl(ty, convert_id id, convert_op op)]
+    | V.BinOp(id, binop, op1, op2) -> [Bin(convert_id id, binop, Exp(convert_op op1), Exp(convert_op op2))]
+    | V.Label l -> [C_spec.Label l]
+    | V.BranchIf(op, l) -> [If(convert_op op, Goto(l))]
+    | V.Goto l -> [Goto l]
+    | V.Call(dest, op, opl) -> 
+      (match opl with
+       | closure:: x:: [] -> [Call(convert_id dest, id_of_op op, id_of_op closure, convert_op x)]
+       | _ -> err "unexpected function call")
+    | V.Return op -> if lbl = "_toplevel" 
+      then [Print(convert_op op); Exit]
+      else [Return(convert_op op)]
+    | V.Malloc(id, opl) ->
+      (match opl with
+       | pointer:: vars ->
+         if is_vm_proc pointer then (* if tuple is closure *)
+           let closure_name = convert_id id in
+           append_closure closure_name;
+           append_defined closure_name;
+           let funct_name = label_of_proc pointer in
+           let var_len = List.length vars in
+           [DeclareClosure closure_name; SetClosurePointer(closure_name, funct_name);
+            SetClosureLength (closure_name, var_len + 1); DeclareClosureParams(var_len + 1)] @
+           (List.mapi (fun i op -> StoreClosureParams(i+1, convert_op op)) vars) @
+           [SetClosureParams closure_name;]
+         else (* if tuple is not closure (a normal tuple) *)
+           let len = List.length opl in
+           let id' = convert_id id in
+           append_tuple id';
+           [DeclareTuple(id', len)] @
+           List.mapi (fun i op -> SetTupleValue(id', i, convert_op op)) opl
+       | _ -> err "undefined")
+    | V.Read(id, op, i) -> 
+      if op_is_closure (convert_op op) then 
+        (if i = 0 
+         then [DeclarePointer(convert_id id); AssignPointer(convert_id id, id_of_op op)]
+         else [Read(convert_id id, convert_op op, i)])
+      else [Read(convert_id id, convert_op op, i)]
+    | V.BEGIN _ -> err "error"
+    | V.END _ -> err "error" in
+  let instrs = List.concat (List.map c_of_instr instr_list) in
+  if lbl = "_toplevel" 
+  then Funct("main", [], instrs)
+  else Funct(lbl, [param0_name; param1_name], instrs)
+
+
+let convert_c = List.map c_of_decl 
+\end{lstlisting}
+
+
+\subsection*{コマンドラインオプション}
+
+\begin{description}
+\item[-C] \hfill
+このオプションをつけると, 生成されたCプログラムが\lstinline{gcc}によってコンパイルされる. \lstinline{./a.out} を実行することにより,プログラムを実行できる.
+
+\item[-o filename] \hfill
+結果を\lstinline{<filename>}に書き込む.
+
+\begin{lstlisting}[caption=実行例, language=bash]
+$ ./minimlc -C -o sigma.c
+# loop v = (1, 0) in
+if v.1 < 101 then
+  recur (v.1 + 1, v.1 + v.2)
+else
+  v.2;;
+compile c program in sigma.c => success
+# ^C
+$./a.out
+5050
+
+\end{lstlisting}
+\end{description}
+
+
+
+
+
+
+\end{document}

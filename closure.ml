@@ -134,7 +134,8 @@ let get_out_of_scope_variables (e: N.exp) (included: N.id list): value list =
         | LoopExp(i, cex, ex) -> 
           MySet.union (loop_ce cex accum (i:: incl)) (loop_e ex accum (i:: incl))
         | LetRecExp(i1, i2, e1, e2) -> 
-          MySet.union (loop_e e1 accum (i2::incl)) (loop_e e2 accum (i2::incl))
+          (* MySet.union (loop_e e1 accum (i2::incl)) (loop_e e2 accum (i2::incl)) *)
+          MySet.union (loop_e e1 accum (i1::i2::incl)) (loop_e e2 accum (i1::i2::incl))
         | CompExp(ce) -> loop_ce ce accum incl
         | _ -> accum
       )

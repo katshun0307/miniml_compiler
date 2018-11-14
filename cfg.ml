@@ -176,15 +176,15 @@ let coalesce_label lbl instrs =
             Vm.Label l -> [(Set.singleton l, None)]
           | _ -> [(Set.empty, Some instr)])
       | stmt :: stmts' ->
-          (match (instr, stmt) with
-             (Vm.Label l, (lbls, None)) ->
-               (Set.insert l lbls, None) :: stmts'
-           | (Vm.Label l, (_, Some _)) ->
-               (Set.singleton l, None) :: stmts
-           | (_, (lbls, None)) ->
-               (lbls, Some instr) :: stmts'
-           | (_, (_, Some _)) ->
-               (Set.empty, Some instr) :: stmts)
+        (match (instr, stmt) with
+           (Vm.Label l, (lbls, None)) ->
+           (Set.insert l lbls, None) :: stmts'
+         | (Vm.Label l, (_, Some _)) ->
+           (Set.singleton l, None) :: stmts
+         | (_, (lbls, None)) ->
+           (lbls, Some instr) :: stmts'
+         | (_, (_, Some _)) ->
+           (Set.empty, Some instr) :: stmts)
     ) [] instrs in
   [(Set.singleton lbl, Vm.BEGIN lbl)] @
   (List.rev (List.map (function
@@ -207,9 +207,9 @@ let find_leaders lstmts =
       | Vm.Call _ | Vm.Malloc _
       | Vm.Read _ -> (false, leaders')
       | Vm.BranchIf (_, lbl) ->
-          (true, Set.insert (find_target lbl) leaders')
+        (true, Set.insert (find_target lbl) leaders')
       | Vm.Goto lbl ->
-          (true, Set.insert (find_target lbl) leaders')
+        (true, Set.insert (find_target lbl) leaders')
       | Vm.Return _ -> (true, leaders')
       | Vm.Label _ -> err "no such case"
     ) (true, Set.empty) lstmts in r
@@ -219,10 +219,10 @@ let find_leaders lstmts =
 let make_bblock lstmts = match lstmts with
     [] -> err "make_bblock: invalid argument."
   | (lbls, i) :: lstmts' ->
-      { labels = lbls;
-        stmts = Array.of_list (List.map snd lstmts);
-        preds = Set.empty;
-        succs = Set.empty }
+    { labels = lbls;
+      stmts = Array.of_list (List.map snd lstmts);
+      preds = Set.empty;
+      succs = Set.empty }
 
 (* leader情報をつかってstmtリストを基本ブロックに分割
    stmt list -> leader集合(stmt Set.t) -> bblock list *)
@@ -275,10 +275,10 @@ let set_edges bbs used_lbls =
       | Vm.Read _ -> add_edge i (i+1)
       | Vm.Label _ -> err "no such case"
       | Vm.BranchIf (_, lbl) ->
-          add_edge i (find_target_bblock lbl);
-          add_edge i (i+1)
+        add_edge i (find_target_bblock lbl);
+        add_edge i (i+1)
       | Vm.Goto lbl ->
-          add_edge i (find_target_bblock lbl)
+        add_edge i (find_target_bblock lbl)
       | Vm.Return _ -> add_edge i (List.length bbs - 1)
     ) bbs;
   bbv

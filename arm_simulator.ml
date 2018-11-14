@@ -150,11 +150,13 @@ let analyze_label =
     | Instr i -> (tbl, n+1, stmts @ [Instr i])
   in List.fold_left f ([], 0, [])
 
-let run all_stmts initial_state =
-  let rec step state = function
+let run all_stmts initial_state verbose =
+  let rec step state stmt_list =
+    if stmt_list <> [] && verbose 
+    then print_string (string_of_stmt(List.hd stmt_list) ^ "\n");
+    match stmt_list with 
     | [] -> state
     | (Instr instr) :: rest ->
-      print_string (string_of_instr instr ^ "\n");
       (match instr with
        | Add (r1, r2, addr) ->
          let r2_val = get_reg_val state r2 in
@@ -220,7 +222,7 @@ let run all_stmts initial_state =
       let pc = get_label_val state l in (set_pc state pc, fetch_instr all_stmts pc) in
   step initial_state (fetch_instr all_stmts initial_state.pc)
 
-let simulate stmts =
+let simulate stmts verbose =
   let (tbl, _, stmts) = analyze_label stmts in
   let initial_state = {
     reg_file =
@@ -234,7 +236,7 @@ let simulate stmts =
     label_table = tbl;
     pc = 0;
   } in
-  run stmts (set_pc initial_state (get_label_val initial_state "_toplevel"))
+  run stmts (set_pc initial_state (get_label_val initial_state "_toplevel")) verbose
 
 let string_of_regfile reg_file =
   List.fold_left (fun acc (reg, v) -> acc ^ string_of_reg reg ^ ": " ^ string_of_int v ^ "\n")

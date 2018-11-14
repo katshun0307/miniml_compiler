@@ -18,9 +18,15 @@ _build*
 *.tex
 !report*.tex
 !report*.pdf
+!benchmarks/benchmark.py
+benchmarks/*.c
+benchmarks/*.out
+benchmarks/*.s
 parser.ml
 parser.mli
 lexer.ml
+*.dot
+cfg_tmp.pdf
 ._d
 ._ncdi
 .vscode/

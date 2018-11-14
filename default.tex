@@ -1,0 +1,62 @@
+\documentclass[a4paper,dvipdfmx]{jsarticle}
+\usepackage{graphicx}
+\usepackage{fancybox}
+\usepackage{ascmac}
+\usepackage{amsmath}
+\usepackage{amsfonts}
+\usepackage{comment}
+\usepackage{here}
+\usepackage{listings,jlisting}
+\usepackage[a4paper,margin=2cm,truedimen]{geometry}
+\usepackage{amssymb}
+\usepackage[svgnames]{xcolor}
+
+  \definecolor{diffstart}{named}{Grey}
+  \definecolor{diffincl}{named}{Green}
+  \definecolor{diffrem}{named}{OrangeRed}
+
+  \lstdefinelanguage{diff}{
+    basicstyle=\ttfamily\small,
+    morecomment=[f][\color{diffstart}]{@@},
+    morecomment=[f][\color{diffincl}]{+\ },
+    morecomment=[f][\color{diffrem}]{-\ },
+  }
+
+\newcommand{\image}[2]{
+    \begin{figure}[H]
+        \begin{center}
+        \includegraphics[width=14cm]{#2}
+        \end{center}
+        \caption{#1}
+        \label{#1}
+    \end{figure}
+}
+
+\newcommand{\code}[1]{\texttt{#1}}
+
+\lstset{
+	language=[Objective]Caml,
+    basicstyle=\ttfamily,
+    keywordstyle=\color[RGB]{33,74,135}\bfseries,
+    stringstyle=\color[RGB]{79,153,5},
+    commentstyle=\color[RGB]{143,89,2}\itshape,
+    numberstyle=\footnotesize,
+    numbers=left,
+    stepnumber=1,
+    numbersep=15pt,
+    backgroundcolor=\color[RGB]{251,251,251},
+    frame=single,
+    frameround=ffff,
+    framesep=5pt,
+    rulecolor=\color[RGB]{148,150,152}, 
+    breaklines=true,
+    breakautoindent=true,
+    breakatwhitespace=true,
+    breakindent=25pt,
+    showspaces=false,
+    showstringspaces=false,
+    showtabs=false,
+    tabsize=2,
+    captionpos=b,
+    linewidth=\textwidth,
+}

@@ -145,13 +145,6 @@ let gen_decl (Vm.ProcDecl (name, nlocal, instrs)): Arm_spec.stmt list =
     Instr(Ldr(Fp, RI(Fp, 0)));
     Instr(Bx(Lr))
   ]
-(* placeholder *)
-(* [Dir (D_align 2);
-   Dir (D_global name);
-   Label name;
-   Instr (Mov (A1, I 1));
-   Label (name ^ "_ret");
-   Instr (Bx Lr)] *)
 
 (* entry point: Vm.decl list -> stmt list *)
 let codegen (vmprog: V.decl list): stmt list =
