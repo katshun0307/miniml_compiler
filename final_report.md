@@ -267,35 +267,47 @@ let trans = List.map trans_decl
 
 > ARMアセンブリコードではなくC言語コードへ変換するコード生成器を作成し,性能比較を行いなさい.
 
-## C言語への変換の方針
 
-### 代入文
+## 実装の方針
 
-```
-<type_of_src> dst = src
-```
+各`Vm.instr`を上から順番にCコードに変換していく.
 
-ただし,`<type_of_src>` には,`"closure"(クロージャ), "int"(数), "int*"(配列), ""(すでに定義されている)`
-のいずれかが入る.
+### クロージャと関数の表現
 
-例として, **ソースコード**の変換結果は**ソースコード**のようななる.
+クロージャは,構造体を用いて表現する. `f`は関数ポインタ(クロージャの0番目), `vars`はスコープ外変数(クロージャの1番目以降),`length`は,スコープ外変数の個数を表す整数が入る.(`length`は結局実装においては使われない.) 
 
-```ocaml
-let a = 3 in let b = a in 0;;
-```
+ただし,スコープ外変数は配列`vars`の0番目から書き込みされず,1番目から書き込みされる. 0番目は初期化されない.
+また,スコープ外変数がない場合でも,`vars`には長さ1の初期化されてない配列が割り当てられる.
+これは,`Vm`でのスコープ外変数参照時のインデックス番号と統一するためである.
+
+#### 構造体の表現
 
 ```C
-int main(){
+typedef struct closure
+{
+    int (*f)(struct closure *, const int);
+    int *vars;
+    int length;
+} closure;
+```
 
-int var00 = 3;
-int var10 = var00;
-int var30 = 0;
-printf("%d\n", var30);
-return 0;
+また,関数はクロージャのポインタと引数を,受け取る形で書かれる.
+
+#### 関数の表現の例
+
+```C
+int _b__recf00(closure *param_0, const int param_1){
+int var00 = 1;
+// ... 
+return var110;
 }
 ```
 
-### labelとgoto文
+### 返り値の表現
+
+プログラム全体の返り値は,`return`ではなく,`printf`で出力する.
+
+### ラベルとgotoの表現
 
 ```
 <labelname>:;
@@ -306,240 +318,108 @@ goto <labelname>;
 
 のような形で,C言語のgoto文を用いて実装する.
 
-### クロージャと関数呼び出し
+`BranchIf`も,
 
-クロージャは, 以下のような struct を用いて実装した.
-
-```C
-typedef struct{
-    int (*f)(const int*, const int);
-    int* vars;
-    int length;
-
-} closure;
+```
+if(var80){
+goto lab10;
+};
 ```
 
-`f`は,第1要素目の関数ポインタ(クロージャの第0要素)を表し,`vars`は,スコープ外変数の列(クロージャの第1要素以降)を表す.
-`length`は,`vars`の長さを保持する.(ただし実装では用いられていない.)
+のように実装する.
 
-また, 混乱を避けるため,クロージャの第1要素は`vars`の第0要素ではなく,第1要素に格納される.
+## 具体的な変換
 
-例えば,**ソースコード**は,**ソースコード**のように変換される.
+変換作業は,`backend.ml`に記述されており,`Vm`コードを`c_spec.ml`で定義した`funct list`に変換していく過程である.
+
+変換おいて,`var_assoc`において`Vm.id`か`C_spec.id`への変換を保持する.
+
+### 代入文
+
+C言語の代入文においては,型を明示的に示さなければいけない.
+このためには,代入元の変数の型を記憶して管理する必要がある.
+
+今回扱う型は,以下の3種類である.
+
+`int`
+: 整数型
+
+`int*`
+: 配列型(クロージャでない`tuple`). `tuple_var`で記憶する.
+
+`closure*`
+: クロージャへのポインタ. `closure_var`で記憶する.
+
+`(空文字列)`
+: すでに代入先の変数が定義されている. `defined_var`で記憶する.
+
+これを管理するために,以下の`ref`型の`Set`を用いている.
 
 ```ocaml
-let a = 1 in let b = 2 in let rec f x = x + a + b in f 5;;
-```
-
-```C
-#include <stdio.h>
-#include <stdlib.h>
-
-typedef struct{
-    int (*f)(const int*, const int);
-    int* vars;
-    int length;
-
-} closure;
-
-int _b__recf10(const int *param_0, const int param_1){
-
-int var02 = param_0[2];
-int var12 = param_1;
-int var21 = param_0[1];
-int var32 = var12 + var02;
-int var51 = var32 + var21;
-return var51;
-}
-
-int main(){
-
-int var03 = 1;
-int var13 = 2;
-closure var22;
-var22.f = _b__recf10;
-var22.length = 3;
-int params[3];
-params[1] = var13;
-params[2] = var03;
-var22.vars = params;
-closure var33 = var22;
-int var40 = 5;
-int (*var52)(const int*, const int);
-var52 = var33.f;
-int var70 = var52(var33.vars, var40);
-printf("%d\n", var70);
-return 0;
-}
-```
-
-
-## C言語の構造の定義
-
-C言語上で使用する命令を, `c_spec.ml`において,定義した.
-
-```ocaml
-(* variable names *)
-type id = string
-type label = string
-type imm = int
-type binop = Syntax.binOp
-
-type ty = 
-  | Int
-  | Closure 
-  | Tuple 
-  | Defined
-
-type op =
-  | Var of id
-  | Imm of imm
-
-type exp = 
-  | Decl of ty * id * op (* int id = op *)
-  | Exp of op (* operand *)
-  | Bin of id * binop * exp * exp 
-  | If of op * exp 
-  | Write of id * int * op (* id[i] = op *)
-  | Return of op (* return op *)
-  | Print of op
-  | Read of id * op * int (* id = op[int] *)
-  | Label of label
-  | Goto of label
-  | Call of id * id * id * op (* id = id(id.vars, x) *)
-  | DeclareTuple of id * int
-  | SetTupleValue of id * int * op
-  | DeclareClosure of id (* closure aru_closure; *)
-  | SetClosurePointer of id * label (* aru_closure.f = b__recf00 *)
-  | SetClosureLength of id * int (* aru_closure.length = 2 *)
-  | DeclareClosureParams of int (* int params[i]; *)
-  | StoreClosureParams of int * op (* params[i] = op *)
-  | SetClosureParams of id (* aru_closure.vars = params *)
-  | DeclarePointer of id
-  | AssignPointer of id * id (* id = id.f *)
-  | Exit
-
-type funct = Funct of id * (id list) * (exp list)
-```
-
-## VMコードからC言語への変換
-
-VMコードから`c_spec.ml`で示したC言語の構造への変換は`c_of_decl`関数を用いて行った.
-
-ただし, `ref`型の値は以下の内容を持つ.
-
-`var_assoc`
-: `Vm.id`か`id`への変換を保持する.
-
-`closure_var` 
-: 中身がクロージャである`id`集合を保持する.
-
-`tuple_var`  
-: 中身が(クロージャではなく)tupleである`id`集合を保持する.
-
-`defined_var` 
-: すでに定義された変数集合を保持する.
-
-```
-let c_of_decl (Vm.ProcDecl(lbl, local_var, instr_list)): funct =
-  (* helper definitions and functions *)
-  let var_assoc = ref (MyMap.empty: (V.id, id) MyMap.t) in
   let closure_var = ref (MySet.empty: id MySet.t) in
   let tuple_var = ref (MySet.empty: id MySet.t) in
   let defined_var = ref (MySet.empty: id MySet.t) in
   let id_is_closure (id: id) = MySet.member id !closure_var in
   let id_is_tuple (id: id) = MySet.member id !tuple_var in
   let id_is_defined (id:  id) = MySet.member id !defined_var in
-  let op_is_closure = function
-    | Var id -> id_is_closure id
-    | Imm _ -> false in
-  let op_is_tuple = function
-    | Var id -> id_is_tuple id
-    | Imm _ -> false in
-  let append_closure id = closure_var := MySet.insert id !closure_var in
-  let append_tuple id = tuple_var := MySet.insert id !tuple_var in
-  let append_defined id = defined_var := MySet.insert id !defined_var in
-  let convert_id id = 
-    match MyMap.search id !var_assoc with
-    | Some id' -> id'
-    | None -> let id' = fresh_var (string_of_int id) in
-      var_assoc := MyMap.append id id' !var_assoc;
-      id' in
-  let id_of_op op = 
-    match op with 
-    | V.Local id -> convert_id id
-    | _ -> err "id_of_exp: unexpected input" in
-  let convert_op op = 
-    match op with
-    | V.Param i -> if i = 0 then Var param0_name
-      else Var param1_name
-    | V.Local id -> Var (convert_id id)
-    | V.IntV i -> Imm i
-    | V.Proc l -> Var ("unexpected_" ^ l) in
-  (* end helper definition and functions *)
-  let rec c_of_instr instr = 
-    match instr with 
-    | V.Move(id, op) -> 
-      let id' = convert_id id in
-      let op' = convert_op op in
-      let id_was_defined = id_is_defined id' in
-      let is_closure = op_is_closure op' in
-      let is_tuple = op_is_tuple op' in
-      if is_closure then append_closure id';
-      if is_tuple then append_tuple id';
-      append_defined id';
-      let ty = if id_was_defined then Defined 
-        else (if is_closure then Closure else if is_tuple then Tuple else Int) in
-      [Decl(ty, convert_id id, convert_op op)]
-    | V.BinOp(id, binop, op1, op2) -> [Bin(convert_id id, binop, Exp(convert_op op1), Exp(convert_op op2))]
-    | V.Label l -> [C_spec.Label l]
-    | V.BranchIf(op, l) -> [If(convert_op op, Goto(l))]
-    | V.Goto l -> [Goto l]
-    | V.Call(dest, op, opl) -> 
-      (match opl with
-       | closure:: x:: [] -> [Call(convert_id dest, id_of_op op, id_of_op closure, convert_op x)]
-       | _ -> err "unexpected function call")
-    | V.Return op -> if lbl = "_toplevel" 
-      then [Print(convert_op op); Exit]
-      else [Return(convert_op op)]
-    | V.Malloc(id, opl) ->
-      (match opl with
-       | pointer:: vars ->
-         if is_vm_proc pointer then (* if tuple is closure *)
-           let closure_name = convert_id id in
-           append_closure closure_name;
-           append_defined closure_name;
-           let funct_name = label_of_proc pointer in
-           let var_len = List.length vars in
-           [DeclareClosure closure_name; SetClosurePointer(closure_name, funct_name);
-            SetClosureLength (closure_name, var_len + 1); DeclareClosureParams(var_len + 1)] @
-           (List.mapi (fun i op -> StoreClosureParams(i+1, convert_op op)) vars) @
-           [SetClosureParams closure_name;]
-         else (* if tuple is not closure (a normal tuple) *)
-           let len = List.length opl in
-           let id' = convert_id id in
-           append_tuple id';
-           [DeclareTuple(id', len)] @
-           List.mapi (fun i op -> SetTupleValue(id', i, convert_op op)) opl
-       | _ -> err "undefined")
-    | V.Read(id, op, i) -> 
-      if op_is_closure (convert_op op) then 
-        (if i = 0 
-         then [DeclarePointer(convert_id id); AssignPointer(convert_id id, id_of_op op)]
-         else [Read(convert_id id, convert_op op, i)])
-      else [Read(convert_id id, convert_op op, i)]
-    | V.BEGIN _ -> err "error"
-    | V.END _ -> err "error" in
-  let instrs = List.concat (List.map c_of_instr instr_list) in
-  if lbl = "_toplevel" 
-  then Funct("main", [], instrs)
-  else Funct(lbl, [param0_name; param1_name], instrs)
-
-
-let convert_c = List.map c_of_decl 
 ```
 
+#### 型の表現(`c_spec.ml`)
+
+```ocaml
+type ty = 
+  | Int
+  | Closure 
+  | Tuple 
+  | Defined
+
+let string_of_ty = function
+  | Int -> "int"
+  | Closure -> "closure*"
+  | Tuple -> "int*"
+  | Defined -> ""
+```
+
+### クロージャと関数呼び出しの変換
+
+クロージャの宣言は, 以下のように行い,クロージャはすべてポインタとして扱うようにする.
+
+```C
+closure var01__;
+closure* var01 = &var01__;
+```
+
+また,クロージャの各メンバの値の設定は以下のようにする.
+
+#### クロージャの設定例
+
+```C
+var01->f = _b__recf00;
+var01->length = 2;
+int params[2];
+params[1] = var11;
+var01->vars = params;
+```
+
+また,クロージャからのメンバ取り出しはアロー演算子によって行う.
+
+#### 関数ポインタの取り出し
+
+```C
+int (*var30)(closure*, const int);
+var30 = var01->f;
+```
+
+#### スコープ外変数の取り出し
+
+```C
+var40 = var01->vars[1];
+```
 
 ## コマンドラインオプション
+
+`-b`
+: ARMコードではなく,C言語の生成を行う.
 
 `-C` 
 : このオプションをつけると, 生成されたCプログラムが`gcc`によってコンパイルされる. `./a.out` を実行することにより,プログラムを実行できる.
@@ -548,7 +428,7 @@ let convert_c = List.map c_of_decl
 : 結果を`<filename>`に書き込む.
 
 ```bash
-$ ./minimlc -C -o sigma.c
+$ ./minimlc -b -C -o sigma.c
 # loop v = (1, 0) in
 if v.1 < 101 then
   recur (v.1 + 1, v.1 + v.2)
@@ -558,8 +438,11 @@ compile c program in sigma.c => success
 # ^C
 $./a.out
 5050
-
 ```
+
+## 性能比較
+
+性能比較･評価は,まとめて[**課題14**](#evaluation)において行っている.
 
 
 # 課題11 (任意: データフロー解析)
@@ -1273,7 +1156,9 @@ Vm.(match ins with
 ```
 Usage: ./minimlc [-vOGs] [-os] [-of] [-od] [-o ofile] [file]
   -o      Set output file (default: stdout)
+  -i      name of source file(default: -)
   -O      perform all optimization (default: false)
+  -reg    generate regcode (default: false)
   -G      Display CFG (default: false)
   -v      Print debug info (default: false)
   -vv     Print many many many debug info (default: false)
@@ -1281,24 +1166,50 @@ Usage: ./minimlc [-vOGs] [-os] [-of] [-od] [-o ofile] [file]
   -os     simple optimization (default: false)
   -of     fold optimization (default: false)
   -od     dead code elimination (default: false)
+  -b      generate c program (default: false)
+  -C      compile C program (default: false)
   -help   Display this list of options
-  --help  Display this list of options 
+  --help  Display this list of options
 ```
 
 `-os`で`simple_elim`を,`-of`で`constant_folding`を,`-od`で`dead_elim`を実行する.
 
-## 実行速度とベンチマークテスト
+## 実行速度とベンチマークテスト {#evaluation}
 
 ベンチマークテストは,`benchmark/benchmark.py`を用いて自動実行できる.
 
+#### 実行例
+
+```
+$ python3 benchmarks/benchmark.py benchmarks/sigma_loop.miniml
+executing ./minimlc -i benchmarks/sigma_loop.miniml -o sigma_loop_opt.c -b  -O
+5050
+cpu time:	0.000237 seconds
+executing ./minimlc -i benchmarks/sigma_loop.miniml -o sigma_loop_no_opt.c -b
+5050
+cpu time:	0.000215 seconds
+executing ./minimlc -i benchmarks/sigma_loop.miniml -o sigma_loop_noreg_noopt_.s
+cpu time:    0.000130208 seconds
+5050
+executing ./minimlc -i benchmarks/sigma_loop.miniml -o sigma_loop_noreg_opt.s -O
+cpu time:    0.000154167 seconds
+5050
+executing ./minimlc -i benchmarks/sigma_loop.miniml -o sigma_loop_reg_noopt.s -reg
+cpu time:    0.000134948 seconds
+5050
+executing ./minimlc -i benchmarks/sigma_loop.miniml -o sigma_loop_reg_opt.s -reg -O
+cpu time:    0.000134375 seconds
+5050
+```
+
 各ベンチマークプログラムに対して,以下のオプションでコンパイルし,計算時間を計測する.
 
-1. C言語の実行時間, VMコード最適化あり.
-2. C言語の実行時間, VMコード最適化なし.
-3. ARMコードの実行時間, レジスタコード生成なし, VMコード最適化なし
-4. ARMコードの実行時間, レジスタコード生成なし, VMコード最適化あり
-5. ARMコードの実行時間, レジスタコード生成あり, VMコード最適化なし
-6. ARMコードの実行時間, レジスタコード生成あり, VMコード最適化あり
+1. C言語の実行時間, VMコード最適化あり.(`C opt`)
+2. C言語の実行時間, VMコード最適化なし.(`C noopt`)
+3. ARMコードの実行時間, レジスタコード生成なし, VMコード最適化なし(`noreg noopt`)
+4. ARMコードの実行時間, レジスタコード生成なし, VMコード最適化あり(`noreg opt`)
+5. ARMコードの実行時間, レジスタコード生成あり, VMコード最適化なし(`reg noopt`)
+6. ARMコードの実行時間, レジスタコード生成あり, VMコード最適化あり(`reg opt`)
 
 ただし,C言語に関しては,以下の例のようにして実行時間を図った.追加されている時間計測用命令はベンチマーク実行プログラムにより自動で追加される.
 
@@ -1409,10 +1320,8 @@ else
 #### fact
 
 ```ocaml
-let rec fact = fun n -> if n < 1 then
-                          1
-                        else
-                          n * fact (n+ -1) in
+let rec fact = fun n -> 
+  if n < 1 then 1 else n * fact (n+ -1) in
 fact 10;;
 ```
 
@@ -1420,7 +1329,7 @@ fact 10;;
 | :-----------: | :---------: | :---------: | :-------------: | :-----------: | :------------: | :---------: |
 | many_add      | 0.000253000 | 0.000253000 | 0.000007605     | 0.000003333   | 0.000031770    | 0.000003281 |
 | sigma_loop    | 0.000434000 | 0.000470000 | 0.000150417     | 0.000147084   | 0.000123020    | 0.000124792 |
-| fact          | 0.000299    | 0.000258    | 0.0001225       | 0.0001275     | 0.000149167    | 0.000124144 |
+| fact          | 0.000208    | 0.000211    | 0.000135885     | 0.000116614   | 0.000113125    | 0.000112656 |
 
 
  ![many_addの結果](./assets/bm_many_add.png)
@@ -1428,4 +1337,3 @@ fact 10;;
  ![sigma_loopの結果](./assets/bm_sigma_loop.png)
 
  ![factの結果](./assets/bm_fact.png)
-

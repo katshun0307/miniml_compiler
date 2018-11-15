@@ -127,7 +127,7 @@ let aspec = Arg.align [
     ("-i", Arg.Set_string src_file,
      " name of source file(default: " ^ !src_file ^ ")");
     ("-O", Arg.Unit (fun () -> optimize := true; !optimize_options.simple <- true; !optimize_options.fold <- true; !optimize_options.dead <- true),
-     " perform all optimization and regcode (default: " ^ (string_of_bool false) ^ ")");
+     " perform all optimization (default: " ^ (string_of_bool false) ^ ")");
     ("-reg", Arg.Unit (fun () -> regcode := true),
      " generate regcode (default: " ^ (string_of_bool !regcode) ^ ")");
     ("-G", Arg.Unit (fun () -> display_cfg := true),

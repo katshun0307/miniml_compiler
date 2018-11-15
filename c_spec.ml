@@ -12,7 +12,6 @@ type ty =
   | Closure 
   | Tuple 
   | Defined
-  | IntPointer
 
 type op =
   | Var of id
@@ -53,7 +52,6 @@ let string_of_ty = function
   | Closure -> "closure*"
   | Tuple -> "int*"
   | Defined -> ""
-  | IntPointer -> "int*"
 
 let string_of_id (id: id) = (id: string)
 
