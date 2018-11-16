@@ -157,6 +157,11 @@ let trans_decl nreg (Vm.ProcDecl (lbl, nlocal, instrs))  =
     Array.set !past_allocations i alloc in
   let get_past_alloc i = 
     Array.get !past_allocations i in
+  let head_allocations = ref (Array.make (Array.length live_bblock) MyMap.empty: (V.id, dest) MyMap.t array) in
+  let set_head_alloc alloc i = 
+    Array.set !head_allocations i alloc in
+  let get_head_alloc i = 
+    Array.get !head_allocations i in
   (* manage offset of local *)
   let offset_counter = ref 0 in
   let get_new_offset () = 
@@ -202,7 +207,7 @@ let trans_decl nreg (Vm.ProcDecl (lbl, nlocal, instrs))  =
       then let ret = get_new_offset () in
         (append_alloc (id, L ret);
          L ret)
-      else let ret =  List.hd free_reg in
+      else let ret = List.hd free_reg in
         (append_alloc (id, R ret);
          R ret)
   in
@@ -272,12 +277,16 @@ let trans_decl nreg (Vm.ProcDecl (lbl, nlocal, instrs))  =
       String.sub s 0 4 = "_b__" || s = "_toplevel" in
     append_instr (List.map (fun l -> Label l) (List.filter (fun l -> not (is_proc_name l)) (MySet.to_list blk.labels)));
     (* load allocation of predecessor *)
-    allocation := MyMap.from_list(
-        MySet.to_list(
-          List.fold_left (fun accum i -> 
-              (MySet.union accum (MySet.from_list(MyMap.to_list(get_past_alloc i))))) 
-            MySet.empty 
-            (MySet.to_list (blk.preds)))); 
+    let union_map map1 map2 = 
+      let set1 = MySet.from_list(MyMap.to_list map1) in
+      let set2 = MySet.from_list(MyMap.to_list map2) in
+      MyMap.from_list(MySet.to_list(MySet.union set1 set2)) in
+    let new_load_alloc =
+      let past_maps = List.map (fun i -> get_past_alloc i) (MySet.to_list blk.preds) in
+      let head_maps =  List.map (fun i -> get_head_alloc i) (MySet.to_list blk.succs) in
+      List.fold_left union_map MyMap.empty (past_maps @ head_maps) in
+    allocation := new_load_alloc;
+    let first_time = ref true in
     (* decide allocation *)
     let decide_allocation instr =
       let before = get_property instr Cfg.BEFORE in
@@ -294,7 +303,9 @@ let trans_decl nreg (Vm.ProcDecl (lbl, nlocal, instrs))  =
             (let dest' = search_alloc id in
              match dest' with
              | Some dest -> loop tl ((id, dest):: accum)
-             | None -> err "unexpected failure in same_allocs")
+             | None -> 
+               let dest' = convert_id id in
+               loop tl ((id, dest'):: accum))
           | _:: tl -> loop tl accum
           | [] -> accum in
         MyMap.from_list (loop (MySet.to_list before) []) in
@@ -308,6 +319,8 @@ let trans_decl nreg (Vm.ProcDecl (lbl, nlocal, instrs))  =
         | Param _ -> () 
         | _ -> err "unexpected input: decide_allocation" in
       List.iter get_dest (MySet.to_list new_ops) in
+    if !first_time then (set_head_alloc !allocation blk_id;
+                         first_time := false);
     (* >>> decide allocation *)
     let reg_of_instr instr =
       if not (Vm.is_label instr)
