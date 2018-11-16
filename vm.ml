@@ -43,6 +43,12 @@ let is_reg = function
   | Param _ | Local _ -> true
   | _ -> false
 
+let type_of_operand = function
+  | Param _ -> "param"
+  | Local _ -> "local"
+  | Proc _ -> "proc"
+  | IntV _ -> "intv" 
+
 (* ==== Formatter ==== *)
 
 let string_of_binop = function

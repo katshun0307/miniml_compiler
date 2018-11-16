@@ -53,7 +53,8 @@ let constant_folding (Vm.ProcDecl(lbl, nlocal, instrs)) =
       match op with
       | Vm.Local id -> (
           match search_reach id with
-          | Some x -> if is_alive ins x then convert_op x else op
+          | Some x -> if Vm.type_of_operand x = "intv" then x 
+            else if is_alive ins x then convert_op x else op
           | None -> op
         )
       | _ -> op in
@@ -109,13 +110,13 @@ let gen_regcode nreg vmcode debug =
   Reg.trans nreg vmcode debug
 
 let optimize is_disp_cfg nreg vmcode options  =
-  let lv = Live.make () in
+  let lv = Reachability.make () in
   (* その他，各種最適化 *)
   let vmcode' = opt vmcode options in
   if options.verbose then
-    print_string ("(* optimized vm code*)\n" ^ Vm.string_of_vm vmcode');
+    print_string ("(* optimized vm code *)\n" ^ Vm.string_of_vm vmcode');
   (* 生存変数解析を実行 *)
-  let cfgs = Cfg.build vmcode' in
+  let cfgs = Cfg.build vmcode in
   let lv_results = analyze_cfg lv cfgs in
   (* 解析結果を表示 *)
   if is_disp_cfg then (
