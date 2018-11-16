@@ -34,7 +34,7 @@ let transfer (entry_vars: def Set.t) (stmt: Vm.instr): def Set.t =
   let gen vs =
     lub
       (match stmt with
-       | Move (dst, src) -> Set.singleton (dst, src)
+       | Move (dst, src) -> if Vm.Local dst <> src then Set.singleton (dst, src) else Set.empty
        | _ -> Set.empty
       )
       vs in
