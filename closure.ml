@@ -114,7 +114,7 @@ let convert_val = function
   | N.Var v -> Var ("_" ^ v)
   | N.IntV i -> IntV i
 
-let get_out_of_scope_variables (e: N.exp) (included: N.id list): value list = 
+let get_out_of_scope_variables (e: N.exp) (included: N.id list): N.value list = 
   let rec loop_e ex accum incl = 
     let rec loop_ce cex caccum incl = 
       N.(match cex with
@@ -134,13 +134,17 @@ let get_out_of_scope_variables (e: N.exp) (included: N.id list): value list =
         | LoopExp(i, cex, ex) -> 
           MySet.union (loop_ce cex accum (i:: incl)) (loop_e ex accum (i:: incl))
         | LetRecExp(i1, i2, e1, e2) -> 
-          (* MySet.union (loop_e e1 accum (i2::incl)) (loop_e e2 accum (i2::incl)) *)
-          MySet.union (loop_e e1 accum (i1::i2::incl)) (loop_e e2 accum (i1::i2::incl))
+          MySet.union (loop_e e1 accum (i1::i2::incl)) (loop_e e2 accum (i1::incl))
         | CompExp(ce) -> loop_ce ce accum incl
         | _ -> accum
       )
   in
-  List.map convert_val (MySet.to_list (loop_e e MySet.empty included))
+  (* List.map convert_val (MySet.to_list (loop_e e MySet.empty included)) *)
+  MySet.to_list (loop_e e MySet.empty included)
+
+let cexp_of_exp = function
+  | CompExp ce -> ce
+  | _ -> err "failure in compexp" 
 
 (* === conversion to closed normal form === *)
 let rec closure_exp (e: N.exp) (f: cexp -> exp) (sigma: cexp Environment.t): exp = 
@@ -170,7 +174,6 @@ let rec closure_exp (e: N.exp) (f: cexp -> exp) (sigma: cexp Environment.t): exp
   | N.LetRecExp(funct, id, e1, e2) -> 
     let recpointer = fresh_id ("b_" ^ funct) in
     let out_of_scope_vars = get_out_of_scope_variables e1 [funct; id] in
-    let funct_tuple_list = (Var recpointer:: out_of_scope_vars) in
     let rec make_tuple_env l i env =  (* make environment from id to projection to var in closure *)
       match l with 
       | Var hd:: tl ->
@@ -180,10 +183,20 @@ let rec closure_exp (e: N.exp) (f: cexp -> exp) (sigma: cexp Environment.t): exp
       | _ -> (match l with 
           | hd:: tl -> err ("unknown input in make_tuple_env" ^ "\n" ^ string_of_closure(CompExp(ValExp(hd))))
           | _ -> err "none valid match") in
-    let sigma' = make_tuple_env out_of_scope_vars 1 Environment.empty in
-    let closure_contents = TupleExp(funct_tuple_list) in
+    let sigma' = make_tuple_env (List.map convert_val out_of_scope_vars) 1 Environment.empty in
+    let funct_tuple_list = (Var recpointer:: List.map convert_val out_of_scope_vars) in
+    let rec get_closure_contents contents = 
+      let closure_contents' = TupleExp(funct_tuple_list) in
+      (match contents with
+       | N.Var x :: tl-> LetExp(convert_id x, 
+                                cexp_of_exp(closure_exp (N.CompExp(N.ValExp(N.Var(x)))) (fun x -> CompExp x) sigma),
+                                get_closure_contents tl)
+       | N.IntV i :: tl-> get_closure_contents tl
+       (* | _ -> LetExp(convert_id funct, closure_contents', closure_exp e2 f sigma')) in *)
+       | _ -> LetExp(convert_id funct, closure_contents', closure_exp e2 f sigma)) in
     let e1' = closure_exp e1 (fun ce -> CompExp(ce)) sigma' in
-    let e2' = LetExp(convert_id funct, closure_contents, closure_exp e2 f sigma') in
+    let e2' = get_closure_contents out_of_scope_vars in
+    (* let e2' = LetExp(convert_id funct, closure_contents, closure_exp e2 f sigma') in *)
     LetRecExp(recpointer, [convert_id funct; convert_id id], e1', e2')
   | N.LoopExp(id, ce1, e2) -> 
     closure_exp (CompExp ce1) (fun y1 -> 

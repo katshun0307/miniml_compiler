@@ -158,8 +158,8 @@ let trans_decl (F.RecDecl (proc_name, params, body)): decl =
     | F.BinOp(op, v1, v2) -> [BinOp(convert_id id, op, operand_of_val v1, operand_of_val v2)]
     | F.AppExp(v, vl) -> [Call(convert_id id, operand_of_val v, List.map operand_of_val vl)]
     | F.IfExp(v, e1, e2) -> 
-      let new_label1 = "lab" ^ string_of_int(fresh_id ()) in
-      let new_label2 = "lab" ^ string_of_int(fresh_id ()) in
+      let new_label1 = "lab" ^ proc_name ^ string_of_int(fresh_id ()) in
+      let new_label2 = "lab" ^ proc_name ^ string_of_int(fresh_id ()) in
       let e2' = trans_exp e2 [] ~ret:id in
       let e1' = trans_exp e1 [] ~ret:id in
       [BranchIf(operand_of_val v, new_label1)] @ e2' @ [Goto(new_label2); Label(new_label1)] @ e1' @ [Label(new_label2)]
