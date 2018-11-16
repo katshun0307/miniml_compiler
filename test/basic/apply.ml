@@ -5,7 +5,6 @@ let equal = fun a -> fun b ->
     false
   else
     true in
-
 let and = fun a -> fun b ->
     if a then
       if b then
@@ -14,10 +13,7 @@ let and = fun a -> fun b ->
         false
     else
       false in
-
-
 let apply = fun f -> fun x -> f x in
-
- and (equal (apply (fun x -> x + 1) 3) 4)
-(and (equal (apply (fun x -> x + x) 3) 6)
-     (equal (apply (fun x -> x * x) 3) 9));;
+and (equal (apply (fun x -> x + 1) 3) 4)
+    (and (equal (apply (fun x -> x + x) 3) 6)
+    (equal (apply (fun x -> x * x) 3) 9));;
