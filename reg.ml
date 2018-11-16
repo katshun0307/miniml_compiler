@@ -67,7 +67,7 @@ let string_of_binop = function
 
 let string_of_dest = function
     R r -> "r" ^ string_of_int r
-  | L oft -> "t" ^ string_of_int oft
+  | L oft -> "l" ^ string_of_int oft
 
 let string_of_operand = function
     Param i -> "p" ^ string_of_int i
@@ -230,13 +230,20 @@ let trans_decl nreg (Vm.ProcDecl (lbl, nlocal, instrs))  =
     | V.Param i -> Param i
     | V.Local id -> 
       let dest = (convert_id id) in
+      debug_string ("dest is " ^ string_of_dest dest);
       (match dest with
        | R i -> Reg i
        | L o -> 
-         (* swap offset with some register *)
-         let swap_r = select_random (get_used_reg ()) in
-         swap o swap_r;
-         Reg swap_r)
+         let free_regs = get_free_reg () in
+         if List.length free_regs <> 0 then
+           let new_r = List.hd free_regs in
+           append_alloc (id, R new_r);
+           Reg new_r
+         else
+           (* swap offset with some register *)
+           let swap_r = select_random (get_used_reg ()) in
+           swap o swap_r;
+           Reg swap_r)
     | V.Proc l -> Proc l
     | V.IntV i -> IntV i
   in
@@ -307,6 +314,9 @@ let trans_decl nreg (Vm.ProcDecl (lbl, nlocal, instrs))  =
       then decide_allocation instr;
       debug_string ("convert " ^ (Vm.string_of_instr "" "" instr) ^ " under the following allocation");
       debug_string (string_of_alloc ());
+      debug_string ("used regs are " ^ String.concat "," (List.map (fun x -> "t" ^ string_of_int x) (get_used_reg ())));
+      debug_string ("free regs are " ^ String.concat "," (List.map (fun x -> "t" ^ string_of_int x) (get_free_reg ())));
+      debug_string ("============");
       match instr with
       | V.Move(id, op) -> 
         let id' = convert_id id in
