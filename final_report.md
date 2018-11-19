@@ -4,7 +4,7 @@
 
 \newpage
 
-# 課題8 (仮想機械コード生成: 必須)
+# 課題8 (必須: 仮想機械コード生成)
 
 > `vm.ml`の`trans`関数を完成させることにより,フラット表現から仮想機械コードへの変換を実現しなさい.
 
@@ -270,11 +270,11 @@ let trans = List.map trans_decl
 
 ## 実装の方針
 
-各`Vm.instr`を上から順番にCコードに変換していく.
+各`Vm.instr`を上から順番にCコードに変換していく.
 
 ### クロージャと関数の表現
 
-クロージャは,構造体を用いて表現する. `f`は関数ポインタ(クロージャの0番目), `vars`はスコープ外変数(クロージャの1番目以降),`length`は,スコープ外変数の個数を表す整数が入る.(`length`は結局実装においては使われない.) 
+クロージャは,構造体を用いて表現する. `f`は関数ポインタ(クロージャの0番目), `vars`はスコープ外変数(クロージャの1番目以降),`length`は,スコープ外変数の個数を表す整数が入る.(`length`は結局実装においては使われない.) 
 
 ただし,スコープ外変数は配列`vars`の0番目から書き込みされず,1番目から書き込みされる. 0番目は初期化されない.
 また,スコープ外変数がない場合でも,`vars`には長さ1の初期化されてない配列が割り当てられる.
@@ -307,7 +307,7 @@ return var110;
 
 プログラム全体の返り値は,`return`ではなく,`printf`で出力する.
 
-### ラベルとgotoの表現
+### ラベルとgotoの表現
 
 ```
 <labelname>:;
@@ -330,7 +330,7 @@ goto lab10;
 
 ## 具体的な変換
 
-変換作業は,`backend.ml`に記述されており,`Vm`コードを`c_spec.ml`で定義した`funct list`に変換していく過程である.
+変換作業は,`backend.ml`に記述されており,`Vm`コードを`c_spec.ml`で定義した`funct list`に変換していく過程である.
 
 変換おいて,`var_assoc`において`Vm.id`か`C_spec.id`への変換を保持する.
 
@@ -347,11 +347,11 @@ C言語の代入文においては,型を明示的に示さなければいけな
 `int*`
 : 配列型(クロージャでない`tuple`). `tuple_var`で記憶する.
 
-`closure*`
-: クロージャへのポインタ. `closure_var`で記憶する.
+`closure*`
+: クロージャへのポインタ. `closure_var`で記憶する.
 
 `(空文字列)`
-: すでに代入先の変数が定義されている. `defined_var`で記憶する.
+: すでに代入先の変数が定義されている. `defined_var`で記憶する.
 
 これを管理するために,以下の`ref`型の`Set`を用いている.
 
@@ -380,7 +380,7 @@ let string_of_ty = function
   | Defined -> ""
 ```
 
-### クロージャと関数呼び出しの変換
+### クロージャと関数呼び出しの変換
 
 クロージャの宣言は, 以下のように行い,クロージャはすべてポインタとして扱うようにする.
 
@@ -428,7 +428,7 @@ var40 = var01->vars[1];
 : 結果を`<filename>`に書き込む.
 
 ```bash
-$ ./minimlc -b -C -o sigma.c
+$ ./minimlc -b -C -o sigma.c
 # loop v = (1, 0) in
 if v.1 < 101 then
   recur (v.1 + 1, v.1 + v.2)
@@ -1060,9 +1060,9 @@ proc _toplevel(10) =
 
 このように,同じレジスタ同士の`Move`命令を消去できている事がわかる.
 
-## 定数畳み込みとコピー解析 - `constant_folding`
+## 定数畳み込み - `constant_folding`
 
-次に,定数畳み込みとコピー解析を1ステップで実装する.これは`opt.ml`中の`constant_folding`に実装してある.
+次に,定数畳み込みを実装する.これは`opt.ml`中の`constant_folding`に実装してある.
 このステップでは,畳込みによって消去できる`Move`命令の消去は行わない.
 それは[**無駄な命令の除去2**](#dead_2)で行う.
 
@@ -1071,10 +1071,10 @@ proc _toplevel(10) =
 命令中に存在する`Vm.operand`型を,以下の2種類に分けて変換する.
 
 タイプ1
-: 可能ならばレジスタではなく定数に変換しても良いもの(定数畳み込み)
+: 可能ならばレジスタではなく定数に変換しても良いもの.
 
 タイプ2
-: レジスタ(`Param`または`Local`)でなければ後々エラーを起こすもの.(コピー解析)
+: レジスタ(`Param`または`Local`)でなければ後々エラーを起こすもの.
 
 たとえば,`BinOp(id, bop, op1, op2)`においては,`op1`はタイプ2にあたり,`op2`はタイプ1に当たる.
 それぞれのタイプについて,到達可能定義解析と生存変数解析を用いて,最適化を行う.
@@ -1091,13 +1091,14 @@ BinOp(t1, Plus, t2, t10)
 このような変換を行う関数を`convert_op`, `convert_op_to_reg`に実装した.
 
 ```ocaml
-    let reach = if not (Vm.is_label ins) then get_property ins Cfg.BEFORE else MyMap.empty in
+  let reach = if not (Vm.is_label ins) then get_property ins Cfg.BEFORE else MyMap.empty in
     let search_reach id = MyMap.search id reach in
     let rec convert_op op = 
       match op with
       | Vm.Local id -> (
           match search_reach id with
-          | Some x -> if is_alive ins x then convert_op x else op
+          | Some x -> if Vm.type_of_operand x = "intv" then x 
+            else if is_alive ins x then convert_op x else op
           | None -> op
         )
       | _ -> op in
@@ -1302,9 +1303,11 @@ _toplevel_ret:
 #### many_add
 
 ```ocaml
-let a = 1 in let b = 2 in let c = 3 in 
-let d = 4 in let e = 5 in let f = 6 in
- let g = 7 in a + b + c + d + e + f + g;;
+let a = 1 in let b = 2 in let c = 3 in let d = 4 in let e = 5 in let f = 6 in let g = 7 in
+let h = 1 in let i = 2 in let j = 3 in let k = 4 in let l = 5 in let m = 6 in let n = 7 in
+let o = 1 in let p = 2 in let q = 3 in let r = 4 in let s = 5 in let t = 6 in let u = 7 in
+let v = 1 in let w = 2 in let x = 3 in let y = 4 in let z = 5 in
+a + b + c + d + e + f + g + h + i + j + k + l + m + n + o + p + q + r + s + t + u + v + w + x + y + z;;
 ```
 
 #### sigma_loop
@@ -1327,7 +1330,7 @@ fact 10;;
 
 | **benchmark** | **C opt**   | **C noopt** | **noreg noopt** | **noreg opt** | **reg nopopt** | **reg opt** |
 | :-----------: | :---------: | :---------: | :-------------: | :-----------: | :------------: | :---------: |
-| many_add      | 0.000253000 | 0.000253000 | 0.000007605     | 0.000003333   | 0.000031770    | 0.000003281 |
+| many_add      | 0.000250000 | 0.000249000 | 0.000004792     | 0.000005260   | 0.000004896    | 0.000003802 |
 | sigma_loop    | 0.000434000 | 0.000470000 | 0.000150417     | 0.000147084   | 0.000123020    | 0.000124792 |
 | fact          | 0.000208    | 0.000211    | 0.000135885     | 0.000116614   | 0.000113125    | 0.000112656 |
 
@@ -1337,3 +1340,69 @@ fact 10;;
  ![sigma_loopの結果](./assets/bm_sigma_loop.png)
 
  ![factの結果](./assets/bm_fact.png)
+
+## 考察
+
+### C言語との速度比較
+
+C言語のほうがARMコードより速度が2倍~50倍程度早い.しかし,逆に言えば,`many_add`にくらべ,他の2つは計算量が明らかに多いため,
+ARMでは実行時間はとても多くなっている. しかし,Cでは,実行時間がほぼ安定である. 
+また,`gcc`の最も強い最適化オプション`-O3`をつけても,C言語の実行時間が大きく変化することはなく,実行毎の誤差レベルであった.
+
+![C言語の実行時間](./assets/bm_c.png)
+
+![ARMの実行時間](./assets/bm_arm.png)
+
+### ARMでの速度比較
+
+`many_add`では,`reg opt`は`noreg noopt`の実行時間と比べ他のベンチマークよりも少なくなっている.これは,代入命令が多いため,レジスタコードでの効果が大きいと考えられる.
+
+実際, それぞれのコードを見比べてみると,`add_many_noreg_noopt_.s`は221行に対し,`add_many_reg_opt.s`は,43行であり,格段に命令数を削減できていることがわかる.
+
+#### `add_many_reg_opt.s`
+
+```{.arm .numberLines}
+	.text
+	.align 2
+	.global _toplevel
+_toplevel:
+	str	fp, [sp, #-4]
+	str	lr, [sp, #-8]
+	sub	fp, sp, #4
+	sub	sp, sp, #16
+	bl	start_timer
+	mov	v1, #1
+	add	v2, v1, #2
+	add	v1, v2, #3
+	add	v2, v1, #4
+	add	v1, v2, #5
+	add	v2, v1, #6
+	add	v1, v2, #7
+	add	v2, v1, #1
+	add	v1, v2, #2
+	add	v2, v1, #3
+	add	v1, v2, #4
+	add	v2, v1, #5
+	add	v1, v2, #6
+	add	v2, v1, #7
+	add	v1, v2, #1
+	add	v2, v1, #2
+	add	v1, v2, #3
+	add	v2, v1, #4
+	add	v1, v2, #5
+	add	v2, v1, #6
+	add	v1, v2, #7
+	add	v2, v1, #1
+	add	v1, v2, #2
+	add	v2, v1, #3
+	add	v1, v2, #4
+	add	v2, v1, #5
+	mov	a1, v2
+	bl	stop_timer
+	b	_toplevel_ret
+_toplevel_ret:
+	add	sp, fp, #4
+	ldr	lr, [fp, #-4]
+	ldr	fp, [fp, #0]
+	bx	lr
+```
